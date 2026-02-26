@@ -23,6 +23,7 @@ from agent_browser.scraper.jobspy_wrapper import run_all_searches
 from agent_browser.scraper.config import DEFAULT_SEARCHES
 from agent_browser.ai.cover_letter import generate_cover_letter
 from agent_browser.ai.job_scorer import score_job
+from agent_browser.ai.outreach_email import generate_outreach_email
 from agent_browser.context.loader import get_user_context
 
 logging.basicConfig(level=logging.INFO)
@@ -107,13 +108,15 @@ async def scrape_and_process(min_score: int = 40):
         job_id = doc.id
 
         try:
-            # Score the job
-            score, reasoning = score_job(
+            # Score the job (returns enriched dict)
+            score_result = score_job(
                 data.get("title", ""),
                 data.get("company", ""),
                 data.get("description", ""),
                 user_context,
             )
+            score = score_result["score"]
+            reasoning = score_result["reasoning"]
             from shared.firestore_client import update_job_score
             update_job_score(job_id, score, reasoning)
             processed += 1
@@ -141,6 +144,13 @@ async def scrape_and_process(min_score: int = 40):
                     status=ApplicationStatus.PENDING_APPROVAL,
                     cover_letter=cover_letter,
                     form_data={**DEFAULT_FORM_DATA, "cover_letter": cover_letter},
+                    fit_score=score,
+                    fit_reasoning=reasoning,
+                    role_summary=score_result.get("role_summary"),
+                    company_summary=score_result.get("company_summary"),
+                    strengths=score_result.get("strengths"),
+                    gaps=score_result.get("gaps"),
+                    suggestions=score_result.get("suggestions"),
                 )
                 app_id = save_application(application)
                 apps_created += 1
@@ -191,8 +201,10 @@ async def process_job(req: ProcessRequest):
 
     user_context = get_user_context()
 
-    # Score the job
-    score, reasoning = score_job(job.title, job.company, job.description, user_context)
+    # Score the job (returns enriched dict)
+    score_result = score_job(job.title, job.company, job.description, user_context)
+    score = score_result["score"]
+    reasoning = score_result["reasoning"]
     update_job_score(req.job_id, score, reasoning)
 
     log(
@@ -219,6 +231,13 @@ async def process_job(req: ProcessRequest):
             status=ApplicationStatus.PENDING_APPROVAL,
             cover_letter=cover_letter,
             form_data={**DEFAULT_FORM_DATA, "cover_letter": cover_letter},
+            fit_score=score,
+            fit_reasoning=reasoning,
+            role_summary=score_result.get("role_summary"),
+            company_summary=score_result.get("company_summary"),
+            strengths=score_result.get("strengths"),
+            gaps=score_result.get("gaps"),
+            suggestions=score_result.get("suggestions"),
         )
         application_id = save_application(application)
 
@@ -325,6 +344,42 @@ async def apply_to_job(req: ApplyRequest):
             )
         log(f"Apply failed: {e}", level=LogLevel.ERROR, application_id=req.application_id)
         return ApplyResponse(success=False, error=str(e))
+
+
+# --- Outreach email generation ---
+
+
+class OutreachRequest(BaseModel):
+    job_id: str
+    contact_name: str | None = None
+
+
+class OutreachResponse(BaseModel):
+    subject: str
+    body: str
+
+
+@app.post("/generate-outreach", response_model=OutreachResponse)
+async def generate_outreach(req: OutreachRequest):
+    """Generate a warm outreach/networking email for a job opportunity."""
+    job = get_job(req.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    user_context = get_user_context()
+
+    try:
+        result = generate_outreach_email(
+            job_title=job.title,
+            company=job.company,
+            job_description=job.description,
+            user_context=user_context,
+            contact_name=req.contact_name,
+        )
+        return OutreachResponse(subject=result["subject"], body=result["body"])
+    except Exception as e:
+        log(f"Outreach email generation failed: {e}", level=LogLevel.ERROR, job_id=req.job_id)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- Health check ---

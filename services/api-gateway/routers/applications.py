@@ -30,6 +30,14 @@ class RejectRequest(BaseModel):
     reason: str = ""
 
 
+class UpdateApplicationRequest(BaseModel):
+    cover_letter: str | None = None
+    cover_letter_edited: str | None = None
+    form_data: dict | None = None
+    outreach_subject: str | None = None
+    outreach_email: str | None = None
+
+
 @router.get("/")
 async def list_applications(
     status: str | None = None,
@@ -64,6 +72,28 @@ async def get_application(app_id: str, user=Depends(verify_firebase_token)):
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Application not found")
     return _sanitize(doc.to_dict())
+
+
+@router.patch("/{app_id}")
+async def update_application(
+    app_id: str,
+    req: UpdateApplicationRequest,
+    user=Depends(verify_firebase_token),
+):
+    """Partial update — save edited cover letter, form fields, outreach email before approval."""
+    doc = db.collection("applications").document(app_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    updates = {"updated_at": datetime.utcnow().isoformat()}
+    # Only include non-None fields
+    for field in ["cover_letter", "cover_letter_edited", "form_data", "outreach_subject", "outreach_email"]:
+        value = getattr(req, field)
+        if value is not None:
+            updates[field] = value
+
+    db.collection("applications").document(app_id).update(updates)
+    return {"status": "updated", "application_id": app_id, "fields_updated": [k for k in updates if k != "updated_at"]}
 
 
 @router.post("/{app_id}/approve")

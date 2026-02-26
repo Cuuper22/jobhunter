@@ -65,6 +65,17 @@ export const api = {
   resumeQueue: () => fetchApi("/api/controls/resume", { method: "POST" }),
   emergencyStop: () => fetchApi("/api/controls/emergency-stop", { method: "POST" }),
 
+  updateApplication: (appId: string, data: Record<string, unknown>) =>
+    fetchApi(`/api/applications/${appId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  generateOutreach: (jobId: string, contactName?: string) =>
+    fetchApi("/api/scheduler/outreach", {
+      method: "POST",
+      body: JSON.stringify({ job_id: jobId, contact_name: contactName || null }),
+    }),
+
   // Scheduler
   triggerScrape: () => fetchApi("/api/scheduler/trigger", { method: "POST" }),
 

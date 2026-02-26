@@ -69,6 +69,17 @@ class Application(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     submitted_at: Optional[datetime] = None
+    # Scoring fields (populated from job_scorer)
+    fit_score: Optional[int] = None  # 0-100
+    fit_reasoning: Optional[str] = None
+    role_summary: Optional[str] = None
+    company_summary: Optional[str] = None
+    strengths: Optional[list[str]] = None
+    gaps: Optional[list[str]] = None
+    suggestions: Optional[list[str]] = None
+    # Outreach fields (populated from outreach_email generator)
+    outreach_subject: Optional[str] = None
+    outreach_email: Optional[str] = None
 
 
 class LogEntry(BaseModel):
