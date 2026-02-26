@@ -81,9 +81,15 @@ def run_search(config: SearchConfig) -> list[Job]:
 
 def run_all_searches(searches: list[SearchConfig] | None = None) -> list[Job]:
     """Run all configured searches and return all new jobs."""
+    import time
     searches = searches or DEFAULT_SEARCHES
     all_jobs = []
-    for search in searches:
+    for i, search in enumerate(searches):
+        if i > 0:
+            # Delay between searches to avoid rate limiting (10-15s)
+            delay = 10 + (i % 3) * 2
+            logger.info(f"Waiting {delay}s before next search...")
+            time.sleep(delay)
         jobs = run_search(search)
         all_jobs.extend(jobs)
     log(
