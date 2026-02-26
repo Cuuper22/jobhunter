@@ -1,0 +1,15 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/jobhunter/dashboard:latest'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=https://api-gateway-73685042772.us-central1.run.app'
+      - '.'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/jobhunter/dashboard:latest']
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/jobhunter/dashboard:latest'

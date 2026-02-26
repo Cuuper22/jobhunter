@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  # Firestore emulator for local development
+  firestore-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+    command: >
+      gcloud emulators firestore start
+        --host-port=0.0.0.0:8181
+    ports:
+      - "8181:8181"
+    environment:
+      - FIRESTORE_EMULATOR_HOST=0.0.0.0:8181
+
+  # Agent-Browser service
+  agent-browser:
+    build:
+      context: .
+      dockerfile: services/agent-browser/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./context:/app/context:ro
+    environment:
+      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8181
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CONTEXT_DIR=/app/context
+      - SKIP_AUTH=true
+      - PORT=8080
+      - APPLICANT_EMAIL=APPLICANT_EMAIL_REDACTED
+      - APPLICANT_PHONE=PHONE_REDACTED
+    depends_on:
+      - firestore-emulator
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8181
+      - SKIP_AUTH=true
+      - PORT=8080
+      - AGENT_BROWSER_URL=http://agent-browser:8080
+      - API_PASSWORD=${API_PASSWORD:-}
+    depends_on:
+      - firestore-emulator
+      - agent-browser
+
+  # Dashboard (frontend)
+  dashboard:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8081
+    ports:
+      - "3000:8080"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - api-gateway

@@ -1,0 +1,8 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/jobhunter/agent-browser:latest', '-f', 'services/agent-browser/Dockerfile', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/jobhunter/agent-browser:latest']
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/jobhunter/agent-browser:latest'
+timeout: 1200s
