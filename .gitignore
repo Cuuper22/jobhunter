@@ -40,8 +40,8 @@ firestore_dump*
 *.pdf
 *.tex
 
-# Screenshots (may contain PII)
-screenshots/
+# Screenshots (mock data only — no real PII)
+# screenshots/
 
 # OS
 .DS_Store

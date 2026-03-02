@@ -55,7 +55,7 @@ function ScoreBadge({ score }: { score?: number }) {
   if (score === undefined || score === null) {
     return (
       <div className="flex flex-col items-center gap-1">
-        <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 text-sm font-bold">
+        <div className="w-12 h-12 rounded-full bg-surface-elevated flex items-center justify-center text-ink-faint text-sm font-bold">
           --
         </div>
       </div>
@@ -64,15 +64,15 @@ function ScoreBadge({ score }: { score?: number }) {
 
   const colorClass =
     score >= 70
-      ? "bg-green-700 text-green-100 border-green-500"
+      ? "bg-signal-success/15 text-signal-success border-signal-success/40"
       : score >= 40
-      ? "bg-yellow-700 text-yellow-100 border-yellow-500"
-      : "bg-red-800 text-red-100 border-red-600";
+      ? "bg-signal-warning/15 text-signal-warning border-signal-warning/40"
+      : "bg-signal-error/15 text-signal-error border-signal-error/40";
 
   return (
     <div className="flex flex-col items-center gap-1 min-w-[3.5rem]">
       <div
-        className={`w-12 h-12 rounded-full border-2 flex items-center justify-center text-sm font-bold ${colorClass}`}
+        className={`w-12 h-12 rounded-full border flex items-center justify-center text-sm font-bold tabular-nums ${colorClass}`}
       >
         {score}
       </div>
@@ -92,16 +92,16 @@ function CollapsibleSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-gray-800 rounded-lg overflow-hidden">
+    <div className="border border-edge rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-850 hover:bg-gray-800 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-surface-secondary hover:bg-surface-elevated transition-colors duration-150 text-left"
       >
-        <span className="text-sm font-semibold text-gray-300">{title}</span>
-        <span className="text-gray-500 text-xs">{open ? "▲" : "▼"}</span>
+        <span className="text-[13px] font-semibold text-ink-muted">{title}</span>
+        <span className="text-ink-faint text-xs">{open ? "▲" : "▼"}</span>
       </button>
-      {open && <div className="px-4 pb-4 pt-3 bg-gray-900">{children}</div>}
+      {open && <div className="px-4 pb-4 pt-3 bg-surface-primary">{children}</div>}
     </div>
   );
 }
@@ -132,8 +132,6 @@ function AppCard({
 
   const set = (patch: Partial<AppCardState>) =>
     setState((prev) => ({ ...prev, ...patch }));
-
-  // -- helpers ---------------------------------------------------------------
 
   const buildPayload = () => ({
     cover_letter_edited: state.coverLetter,
@@ -201,23 +199,21 @@ function AppCard({
     set({ formData: { ...state.formData, [key]: value } });
   };
 
-  // -- render ----------------------------------------------------------------
-
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-5">
-      {/* ---- Header ---- */}
+    <div className="bg-surface-secondary border border-edge rounded-lg p-5 space-y-5 hover:border-edge-strong transition-colors duration-150">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-gray-100 truncate">
+          <h3 className="text-[15px] font-semibold text-ink-heading truncate tracking-heading">
             {app.job_title}
           </h3>
-          <p className="text-gray-400 text-sm">{app.company}</p>
-          <div className="flex items-center gap-3 mt-1">
+          <p className="text-ink-muted text-[13px] mt-0.5">{app.company}</p>
+          <div className="flex items-center gap-3 mt-1.5">
             <a
               href={app.job_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-400 text-xs hover:underline"
+              className="text-accent-primary text-[12px] hover:underline"
             >
               View posting
             </a>
@@ -226,12 +222,12 @@ function AppCard({
                 href={app.screenshot_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-purple-400 text-xs hover:underline"
+                className="text-accent-secondary text-[12px] hover:underline"
               >
                 Form screenshot
               </a>
             )}
-            <span className="text-gray-600 text-xs">
+            <span className="text-ink-faint text-[11px]">
               {new Date(app.created_at).toLocaleDateString()}
             </span>
           </div>
@@ -239,32 +235,32 @@ function AppCard({
         <div className="flex flex-col items-center gap-1 shrink-0">
           <ScoreBadge score={app.fit_score} />
           {app.fit_reasoning && (
-            <p className="text-xs text-gray-500 text-center max-w-[10rem] leading-tight">
+            <p className="text-[11px] text-ink-faint text-center max-w-[10rem] leading-tight">
               {app.fit_reasoning}
             </p>
           )}
         </div>
       </div>
 
-      {/* ---- Role & Company Summaries ---- */}
+      {/* Role & Company Summaries */}
       {(app.role_summary || app.company_summary) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {app.role_summary && (
-            <div className="bg-gray-800 rounded-lg p-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+            <div className="bg-surface-elevated/50 rounded-md p-3">
+              <p className="text-[10px] font-medium text-ink-faint uppercase tracking-widest mb-1">
                 Role
               </p>
-              <p className="text-sm text-gray-300 leading-relaxed">
+              <p className="text-[13px] text-ink-body leading-relaxed">
                 {app.role_summary}
               </p>
             </div>
           )}
           {app.company_summary && (
-            <div className="bg-gray-800 rounded-lg p-3">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+            <div className="bg-surface-elevated/50 rounded-md p-3">
+              <p className="text-[10px] font-medium text-ink-faint uppercase tracking-widest mb-1">
                 Company
               </p>
-              <p className="text-sm text-gray-300 leading-relaxed">
+              <p className="text-[13px] text-ink-body leading-relaxed">
                 {app.company_summary}
               </p>
             </div>
@@ -272,7 +268,7 @@ function AppCard({
         </div>
       )}
 
-      {/* ---- Fit Analysis (collapsible) ---- */}
+      {/* Fit Analysis */}
       {(app.strengths?.length ||
         app.gaps?.length ||
         app.suggestions?.length) && (
@@ -284,13 +280,13 @@ function AppCard({
           <div className="space-y-4">
             {app.strengths && app.strengths.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-green-400 uppercase tracking-wide mb-2">
+                <p className="text-[10px] font-medium text-signal-success uppercase tracking-widest mb-2">
                   Strengths
                 </p>
                 <ul className="space-y-1">
                   {app.strengths.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                      <span className="text-green-400 mt-0.5 shrink-0">✓</span>
+                    <li key={i} className="flex items-start gap-2 text-[13px] text-ink-body">
+                      <span className="text-signal-success mt-0.5 shrink-0">✓</span>
                       <span>{s}</span>
                     </li>
                   ))}
@@ -299,13 +295,13 @@ function AppCard({
             )}
             {app.gaps && app.gaps.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-yellow-400 uppercase tracking-wide mb-2">
+                <p className="text-[10px] font-medium text-signal-warning uppercase tracking-widest mb-2">
                   Gaps
                 </p>
                 <ul className="space-y-1">
                   {app.gaps.map((g, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                      <span className="text-yellow-400 mt-0.5 shrink-0">⚠</span>
+                    <li key={i} className="flex items-start gap-2 text-[13px] text-ink-body">
+                      <span className="text-signal-warning mt-0.5 shrink-0">⚠</span>
                       <span>{g}</span>
                     </li>
                   ))}
@@ -314,13 +310,13 @@ function AppCard({
             )}
             {app.suggestions && app.suggestions.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-blue-400 uppercase tracking-wide mb-2">
+                <p className="text-[10px] font-medium text-accent-primary uppercase tracking-widest mb-2">
                   Suggestions
                 </p>
                 <ul className="space-y-1">
                   {app.suggestions.map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-300">
-                      <span className="text-blue-400 mt-0.5 shrink-0">💡</span>
+                    <li key={i} className="flex items-start gap-2 text-[13px] text-ink-body">
+                      <span className="text-accent-primary mt-0.5 shrink-0">→</span>
                       <span>{s}</span>
                     </li>
                   ))}
@@ -331,11 +327,11 @@ function AppCard({
         </CollapsibleSection>
       )}
 
-      {/* ---- Cover Letter ---- */}
+      {/* Cover Letter */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-semibold text-gray-300">Cover Letter</h4>
-          <span className="text-xs text-gray-500">
+          <h4 className="text-[13px] font-semibold text-ink-muted">Cover Letter</h4>
+          <span className="text-[11px] text-ink-faint tabular-nums">
             {wordCount(state.coverLetter)} words
           </span>
         </div>
@@ -343,11 +339,11 @@ function AppCard({
           value={state.coverLetter}
           onChange={(e) => set({ coverLetter: e.target.value })}
           rows={10}
-          className="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded-lg p-3 text-sm font-mono resize-y focus:outline-none focus:border-gray-500 leading-relaxed"
+          className="w-full bg-surface-primary text-ink-body border border-edge rounded-md p-3 text-[13px] font-mono resize-y focus:outline-none focus:border-edge-strong leading-relaxed transition-colors duration-150"
         />
       </div>
 
-      {/* ---- Form Data (collapsible) ---- */}
+      {/* Form Data */}
       {Object.keys(state.formData).length > 0 && (
         <CollapsibleSection
           title={`Form Fields (${Object.keys(state.formData).length})`}
@@ -357,14 +353,14 @@ function AppCard({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {Object.entries(state.formData).map(([key, value]) => (
               <div key={key}>
-                <label className="block text-xs text-gray-500 mb-1 font-mono">
+                <label className="block text-[11px] text-ink-faint mb-1 font-mono">
                   {key}
                 </label>
                 <input
                   type="text"
                   value={value}
                   onChange={(e) => updateFormField(key, e.target.value)}
-                  className="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-500"
+                  className="w-full bg-surface-primary text-ink-body border border-edge rounded-md px-3 py-1.5 text-[13px] focus:outline-none focus:border-edge-strong transition-colors duration-150"
                 />
               </div>
             ))}
@@ -372,35 +368,35 @@ function AppCard({
         </CollapsibleSection>
       )}
 
-      {/* ---- Outreach Email ---- */}
-      <div className="border border-gray-800 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-900">
-          <span className="text-sm font-semibold text-gray-300">
+      {/* Outreach Email */}
+      <div className="border border-edge rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary">
+          <span className="text-[13px] font-semibold text-ink-muted">
             Outreach Email
           </span>
           <button
             type="button"
             onClick={handleGenerateOutreach}
             disabled={state.outreachLoading}
-            className="text-xs bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white px-3 py-1 rounded font-medium transition-colors"
+            className="text-[12px] bg-accent-primary/15 hover:bg-accent-primary/25 disabled:opacity-50 text-accent-primary px-3 py-1 rounded-md font-medium transition-colors duration-150"
           >
             {state.outreachLoading ? "Generating..." : "Draft Outreach"}
           </button>
         </div>
         {state.outreachVisible && (
-          <div className="px-4 pb-4 pt-3 bg-gray-900 space-y-3">
+          <div className="px-4 pb-4 pt-3 bg-surface-primary space-y-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Subject</label>
+              <label className="block text-[11px] text-ink-faint mb-1">Subject</label>
               <input
                 type="text"
                 value={state.outreachSubject}
                 onChange={(e) => set({ outreachSubject: e.target.value })}
                 placeholder="Email subject line..."
-                className="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-500"
+                className="w-full bg-surface-secondary text-ink-body border border-edge rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-edge-strong placeholder:text-ink-faint transition-colors duration-150"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Body</label>
+              <label className="block text-[11px] text-ink-faint mb-1">Body</label>
               <textarea
                 value={state.outreachEmail}
                 onChange={(e) => set({ outreachEmail: e.target.value })}
@@ -410,20 +406,20 @@ function AppCard({
                     ? "Generating outreach email..."
                     : "Email body will appear here..."
                 }
-                className="w-full bg-gray-800 text-gray-200 border border-gray-700 rounded px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:border-gray-500"
+                className="w-full bg-surface-secondary text-ink-body border border-edge rounded-md px-3 py-2 text-[13px] font-mono resize-y focus:outline-none focus:border-edge-strong placeholder:text-ink-faint transition-colors duration-150"
               />
             </div>
           </div>
         )}
       </div>
 
-      {/* ---- Action Buttons ---- */}
+      {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <button
           type="button"
           onClick={handleApprove}
           disabled={state.actionLoading}
-          className="bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+          className="bg-signal-success/15 hover:bg-signal-success/25 border border-signal-success/30 disabled:opacity-50 text-signal-success px-5 py-2 rounded-md font-medium text-[13px] transition-colors duration-150"
         >
           {state.actionLoading ? "Submitting..." : "Approve & Submit"}
         </button>
@@ -431,7 +427,7 @@ function AppCard({
           type="button"
           onClick={handleSave}
           disabled={state.saving || state.actionLoading}
-          className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-200 px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+          className="bg-surface-elevated hover:bg-surface-elevated/80 border border-edge disabled:opacity-50 text-ink-body px-5 py-2 rounded-md font-medium text-[13px] transition-colors duration-150"
         >
           {state.saving ? "Saving..." : "Save Changes"}
         </button>
@@ -439,7 +435,7 @@ function AppCard({
           type="button"
           onClick={handleSkip}
           disabled={state.actionLoading}
-          className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-400 px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+          className="bg-surface-primary hover:bg-surface-secondary border border-edge disabled:opacity-50 text-ink-muted px-5 py-2 rounded-md font-medium text-[13px] transition-colors duration-150"
         >
           Skip
         </button>
@@ -447,7 +443,7 @@ function AppCard({
           type="button"
           onClick={handleRescore}
           disabled={state.actionLoading}
-          className="border border-orange-600 hover:bg-orange-600/10 text-orange-400 px-5 py-2 rounded-lg font-medium text-sm transition-colors"
+          className="border border-signal-warning/30 hover:bg-signal-warning/10 text-signal-warning px-5 py-2 rounded-md font-medium text-[13px] transition-colors duration-150"
         >
           Re-score
         </button>
@@ -490,7 +486,7 @@ export default function ApplicationReview() {
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <p className="text-gray-500 text-sm">Loading applications...</p>
+        <p className="text-ink-muted text-sm">Loading applications...</p>
       </div>
     );
   }
@@ -498,16 +494,16 @@ export default function ApplicationReview() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-200">
+        <h2 className="text-[15px] font-semibold text-ink-heading tracking-heading">
           Pending Approval
-          <span className="ml-2 text-sm font-normal text-gray-500">
+          <span className="ml-2 text-[13px] font-normal text-ink-faint tabular-nums">
             ({apps.length})
           </span>
         </h2>
         <button
           type="button"
           onClick={refresh}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          className="text-[12px] text-ink-faint hover:text-ink-muted transition-colors duration-150"
         >
           Refresh
         </button>
@@ -515,8 +511,8 @@ export default function ApplicationReview() {
 
       {apps.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-gray-500">No applications pending review.</p>
-          <p className="text-gray-600 text-sm mt-1">
+          <p className="text-ink-muted text-[14px]">No applications pending review.</p>
+          <p className="text-ink-faint text-[13px] mt-1">
             The agent will surface new ones as jobs are found.
           </p>
         </div>

@@ -25,18 +25,26 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const tabs = [
+    { key: "review" as const, label: "Review" },
+    { key: "jobs" as const, label: "Jobs" },
+    { key: "logs" as const, label: "Logs" },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-surface-primary text-ink-body">
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-6 py-4">
+      <header className="bg-surface-secondary border-b border-edge px-6 py-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">JobHunter AI</h1>
+            <h1 className="text-xl font-semibold text-ink-heading tracking-heading">
+              jobhunter
+            </h1>
             <button
               onClick={() => { clearPassword(); window.location.reload(); }}
-              className="text-xs text-gray-500 hover:text-gray-300"
+              className="text-[11px] text-ink-faint hover:text-ink-muted transition-colors duration-200"
             >
-              Logout
+              logout
             </button>
           </div>
           <Controls />
@@ -45,34 +53,34 @@ export default function Dashboard() {
 
       {/* Stats Bar */}
       {stats && (
-        <div className="bg-gray-900/50 border-b border-gray-800">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex gap-8">
-            <Stat label="Jobs Scraped" value={stats.total_jobs_scraped} />
+        <div className="bg-surface-secondary/60 border-b border-edge">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex gap-10">
+            <Stat label="Scraped" value={stats.total_jobs_scraped} />
             <Stat label="Applications" value={stats.total_applications} />
             <Stat
-              label="Pending Review"
+              label="Pending"
               value={stats.pending_approval}
               highlight={stats.pending_approval > 0}
             />
-            <Stat label="Submitted" value={stats.submitted} color="text-green-400" />
+            <Stat label="Submitted" value={stats.submitted} accent />
           </div>
         </div>
       )}
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-6 pt-4">
-        <div className="flex gap-1 border-b border-gray-800">
-          {(["review", "jobs", "logs"] as const).map((tab) => (
+        <div className="flex gap-0 border-b border-edge">
+          {tabs.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium capitalize ${
-                activeTab === tab
-                  ? "text-blue-400 border-b-2 border-blue-400"
-                  : "text-gray-400 hover:text-gray-200"
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2.5 text-[13px] font-medium transition-colors duration-200 ${
+                activeTab === tab.key
+                  ? "text-accent-primary border-b-2 border-accent-primary"
+                  : "text-ink-muted hover:text-ink-body"
               }`}
             >
-              {tab === "review" ? "Review Applications" : tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -92,22 +100,28 @@ function Stat({
   label,
   value,
   highlight = false,
-  color = "",
+  accent = false,
 }: {
   label: string;
   value: number;
   highlight?: boolean;
-  color?: string;
+  accent?: boolean;
 }) {
   return (
     <div>
-      <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
+      <div className="text-[10px] text-ink-faint uppercase tracking-widest font-medium">
+        {label}
+      </div>
       <div
-        className={`text-xl font-bold ${
-          color || (highlight ? "text-yellow-400" : "text-white")
+        className={`text-lg font-semibold tracking-heading tabular-nums ${
+          accent
+            ? "text-accent-secondary"
+            : highlight
+            ? "text-signal-warning"
+            : "text-ink-heading"
         }`}
       >
-        {value}
+        {value.toLocaleString()}
       </div>
     </div>
   );
@@ -121,44 +135,49 @@ function JobList() {
   }, []);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {jobs.map((job) => (
         <div
           key={job.id}
-          className="bg-gray-900 border border-gray-800 rounded-lg p-4 flex justify-between items-start"
+          className="bg-surface-secondary border border-edge rounded-lg p-4 flex justify-between items-start hover:border-edge-strong transition-colors duration-200"
         >
           <div>
-            <h3 className="font-semibold">{job.title}</h3>
-            <p className="text-gray-400 text-sm">
+            <h3 className="font-medium text-ink-heading text-[15px]">{job.title}</h3>
+            <p className="text-ink-muted text-[13px] mt-0.5">
               {job.company} &middot; {job.location}
             </p>
             {job.salary_min && (
-              <p className="text-green-400 text-sm">
-                ${job.salary_min.toLocaleString()} - ${job.salary_max?.toLocaleString()}
+              <p className="text-accent-secondary text-[13px] mt-1 font-medium tabular-nums">
+                ${job.salary_min.toLocaleString()} – ${job.salary_max?.toLocaleString()}
               </p>
             )}
           </div>
-          <div className="text-right">
+          <div className="text-right flex flex-col items-end gap-1">
             {job.fit_score != null && (
-              <span
-                className={`text-lg font-bold ${
-                  job.fit_score >= 70
-                    ? "text-green-400"
-                    : job.fit_score >= 40
-                    ? "text-yellow-400"
-                    : "text-red-400"
-                }`}
-              >
-                {job.fit_score}%
-              </span>
+              <ScoreInline score={job.fit_score} />
             )}
-            <div className="text-xs text-gray-500 mt-1">{job.source}</div>
+            <div className="text-[11px] text-ink-faint">{job.source}</div>
           </div>
         </div>
       ))}
       {jobs.length === 0 && (
-        <p className="text-gray-500 text-center py-8">No jobs scraped yet</p>
+        <p className="text-ink-muted text-center py-12 text-sm">No jobs scraped yet</p>
       )}
     </div>
+  );
+}
+
+function ScoreInline({ score }: { score: number }) {
+  const color =
+    score >= 70
+      ? "text-signal-success"
+      : score >= 40
+      ? "text-signal-warning"
+      : "text-signal-error";
+
+  return (
+    <span className={`text-lg font-semibold tabular-nums ${color}`}>
+      {score}
+    </span>
   );
 }

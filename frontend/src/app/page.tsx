@@ -10,7 +10,6 @@ export default function Home() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // Check if password already stored
     const saved = localStorage.getItem("jh_password");
     if (saved) setAuthed(true);
   }, []);
@@ -31,7 +30,6 @@ export default function Home() {
         setError("Invalid password");
       }
     } catch {
-      // Health endpoint may not require auth — try stats instead
       try {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081";
         const res = await fetch(`${API_BASE}/api/stats`, {
@@ -53,28 +51,28 @@ export default function Home() {
   if (authed) return <Dashboard />;
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+    <div className="min-h-screen bg-surface-primary flex items-center justify-center">
       <form
         onSubmit={handleLogin}
-        className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-sm"
+        className="bg-surface-secondary border border-edge rounded-lg p-8 w-full max-w-sm shadow-md"
       >
-        <h1 className="text-2xl font-bold text-white mb-6 text-center">
-          JobHunter AI
+        <h1 className="text-xl font-semibold text-ink-heading tracking-heading mb-6 text-center">
+          jobhunter
         </h1>
         <input
           type="password"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           placeholder="Enter password"
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 mb-4"
+          className="w-full bg-surface-primary border border-edge rounded-md px-4 py-3 text-ink-body placeholder:text-ink-faint focus:outline-none focus:border-edge-strong mb-4 text-[14px] transition-colors duration-150"
           autoFocus
         />
         {error && (
-          <p className="text-red-400 text-sm mb-4">{error}</p>
+          <p className="text-signal-error text-[13px] mb-4">{error}</p>
         )}
         <button
           type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-lg transition"
+          className="w-full bg-accent-primary/15 hover:bg-accent-primary/25 border border-accent-primary/30 text-accent-primary font-medium py-3 rounded-md text-[14px] transition-colors duration-150"
         >
           Sign In
         </button>

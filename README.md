@@ -44,6 +44,16 @@ graph TD
 
 Three services on Cloud Run. Firestore is the shared state. The dashboard polls every 30 seconds and shows pending applications for human review.
 
+## Dashboard
+
+The review interface where every application gets a human decision before submission.
+
+| Review Queue | Jobs List | Activity Log |
+|:---:|:---:|:---:|
+| ![Review](screenshots/dashboard-review.png) | ![Jobs](screenshots/dashboard-jobs.png) | ![Logs](screenshots/dashboard-logs.png) |
+
+Each application card shows the AI's fit analysis (score, strengths, gaps, suggestions), the generated cover letter, pre-filled form fields, and an outreach email drafter. The reviewer can edit anything before approving.
+
 ## The Safety Mechanisms
 
 This is the part I care about most.
