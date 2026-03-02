@@ -2,6 +2,14 @@
 
 An AI job application system that scrapes, scores, and drafts — but won't submit without your say-so, and won't lie about your credentials.
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python](https://img.shields.io/badge/Python-3.11-blue.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue.svg)
+![GCP](https://img.shields.io/badge/GCP-Cloud%20Run-orange.svg)
+![Status](https://img.shields.io/badge/Status-Offline%20(billing%20paused)-lightgrey.svg)
+
+> **Status:** Currently offline (GCP billing paused). All metrics below reflect the last active state. Everything runs locally via `docker compose up`.
+
 ## Why
 
 I needed a job. I also needed to not manually apply to 200 listings a week.
@@ -16,45 +24,22 @@ The more interesting constraint is honesty. The system prompts contain an explic
 
 Half the scored jobs cluster at exactly 50 on the 0-100 scale. The scoring threshold is 40. Which means the model's uncertainty generates work for the human reviewer. The AI hedges, and I have to decide.
 
-This is a small-scale version of the alignment problem: an autonomous agent optimizing for an objective while constrained by values, with a human in the loop who has the final say. It also found me some good leads.
+This is a small-scale version of the alignment problem: an autonomous agent optimizing for an objective while constrained by values, with a human in the loop who has the final say. Same tension I explored in [polymarket_bot](https://github.com/Cuuper22/polymarket_bot) — knowing when an autonomous system should NOT act. It also found me some good leads.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Cloud Scheduler                            │
-│                   (cron: every 3 hours)                         │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ POST /scrape-and-score
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    API Gateway (FastAPI)                         │
-│                                                                 │
-│  /jobs          — list scraped jobs                             │
-│  /applications  — list applications + approval workflow         │
-│  /scrape-and-score — trigger full pipeline                      │
-│  /controls      — pause / resume / emergency-stop               │
-│                                                                 │
-│  Auth: Bearer token from Secret Manager                         │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                Agent Browser (FastAPI + Playwright)              │
-│                                                                 │
-│  Scraper ──► Scorer ──► Cover Letter ──► Form Filler            │
-│  (jobspy)    (Gemini)   (Gemini)         (Playwright)           │
-│                                                                 │
-│  Each module has independent retry logic (5s, 10s, 20s)         │
-│  Honesty constraints enforced at the prompt level               │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────┐  ┌──────────────────┐  ┌────────────────────┐
-│    Firestore     │  │  Cloud Storage   │  │     Dashboard      │
-│  (jobs, apps,    │  │  (resume, context │  │  (Next.js + React) │
-│   task queue)    │  │   documents)     │  │  Review & approve  │
-└──────────────────┘  └──────────────────┘  └────────────────────┘
+```mermaid
+graph TD
+    CS[Cloud Scheduler<br/>cron: every 3 hours] -->|POST /scrape-and-process| AG[API Gateway<br/>FastAPI]
+    AG --> AB[Agent Browser<br/>FastAPI + Playwright]
+    AB --> S[Scraper<br/>jobspy]
+    S --> SC[Scorer<br/>Gemini]
+    SC --> CL[Cover Letter<br/>Gemini]
+    CL --> FF[Form Filler<br/>Playwright]
+    AB --> FS[(Firestore)]
+    AB --> GCS[(Cloud Storage)]
+    AG --> D[Dashboard<br/>Next.js + React]
+    D -->|Human reviews & approves| AG
 ```
 
 Three services on Cloud Run. Firestore is the shared state. The dashboard polls every 30 seconds and shows pending applications for human review.
@@ -67,7 +52,7 @@ This is the part I care about most.
 
 **Honesty constraints in system prompts.** Three separate AI modules (scorer, cover letter, form QA) each contain explicit instructions about what the system must not fabricate:
 
-```
+```python
 # From cover_letter.py
 "The candidate does NOT have a completed degree. He has 76 credits
 from Minerva University. Do NOT say 'Bachelor's degree' — say
@@ -83,14 +68,16 @@ BS/MS but not fatally"
 a completed degree"
 ```
 
-This isn't post-hoc filtering. The constraints live in the system prompts themselves — specification-level truthfulness enforcement.
+This isn't post-hoc filtering. The constraints live in the system prompts themselves — specification-level truthfulness enforcement. Same principle as [Erdos](https://github.com/Cuuper22/Erdos): prevent the optimizer from redefining its own constraints. There, SHA-256 locks. Here, system prompt constraints.
 
 **Emergency controls.** Three endpoints on the API gateway:
 - `POST /pause` — pause the Cloud Tasks queue
 - `POST /resume` — resume the queue
 - `POST /emergency-stop` — pause AND purge all pending tasks
 
-## How Scoring Works
+## How It Works
+
+### Scoring
 
 Gemini 3.1 Pro scores each job 0-100 using a structured rubric:
 
@@ -102,11 +89,9 @@ Gemini 3.1 Pro scores each job 0-100 using a structured rubric:
 | 20-39 | Weak fit — significant mismatches |
 | 0-19 | Poor fit — wrong domain or level |
 
-The model returns structured JSON: `score`, `reasoning`, `role_summary`, `company_summary`, `strengths`, `gaps`, and `suggestions`.
+The model returns structured JSON: `score`, `reasoning`, `role_summary`, `company_summary`, `strengths`, `gaps`, and `suggestions`. The scoring threshold is 40. In practice, scores cluster heavily around 50 — the model hedges when it's unsure, which creates a fat middle band of "maybe" jobs that require human judgment.
 
-The scoring threshold is 40. Anything above gets a cover letter generated. In practice, scores cluster heavily around 50 — the model hedges when it's unsure, which creates a fat middle band of "maybe" jobs that require human judgment.
-
-## How Cover Letters Work
+### Cover Letters
 
 Each cover letter follows a rigid 4-paragraph structure:
 
@@ -115,23 +100,27 @@ Each cover letter follows a rigid 4-paragraph structure:
 3. **Projects & Technical Depth** (4-6 sentences) — specific work
 4. **Close & Call to Action** (2-3 sentences) — next steps
 
-Word count is enforced at 250-350 words. If the first generation misses the target, the system retries with explicit word count correction. The cover letter module also adapts tone to company culture — startup casual vs. corporate formal.
+Word count is enforced at 250-350 words. If the first generation is too short, the system retries with explicit length correction. Tone adapts to company culture — startup casual vs. corporate formal. The honesty constraint means every cover letter says "coursework at Minerva University" instead of "degree from Minerva University."
 
-The honesty constraint means every cover letter says "coursework at Minerva University" instead of "degree from Minerva University." The AI could easily fabricate a more impressive background. It's told not to.
+### Outreach Emails
+
+A separate module generates warm networking emails — not cold spam. Each email is 150-200 words, references something specific about the recipient or company, and makes a low-friction ask (15-minute chat, not "give me a job"). Same honesty constraints apply: only reference real experience, never fabricate.
+
+Available via `POST /generate-outreach` with an optional contact name.
 
 ## ATS Form Detection
 
-The form filler detects five applicant tracking systems:
+`form_filler.py` detects five applicant tracking systems by URL pattern and handles each accordingly:
 
-| ATS | Detection | Adapter |
+| ATS | Detection | Handling |
 |-----|-----------|---------|
-| Greenhouse | URL pattern | Full adapter |
-| Lever | URL pattern | Full adapter |
-| Workday | URL pattern | Full adapter |
-| iCIMS | URL pattern | Detected, generic fill |
-| BambooHR | URL pattern | Detected, generic fill |
+| Greenhouse | `greenhouse.io` in URL | Dedicated adapter — `#first_name`, `#last_name`, `#email`, cover letter textarea, file upload |
+| Lever | `lever.co` in URL | Dedicated adapter — `input[name='name']`, `input[name='email']`, comments field |
+| Workday | `myworkdayjobs.com` in URL | Dedicated adapter — `data-automation-id` attributes for each field |
+| iCIMS | `icims.com` in URL | Detected, screenshot for manual review |
+| BambooHR | `bamboohr.com` in URL | Detected, screenshot for manual review |
 
-For Greenhouse, Lever, and Workday, dedicated adapters know the exact form field selectors. For iCIMS and BambooHR, the system falls back to generic field detection. All form filling stops before submission — the submit button is never clicked automatically.
+All form filling stops before submission. The submit button is never clicked automatically. Screening questions found on the form are detected and answered by the form QA module.
 
 ## Tech Stack
 
@@ -164,7 +153,11 @@ This starts:
 - API Gateway on port 8081
 - Dashboard on port 3000
 
-You'll need a Gemini API key. Everything else runs locally via Docker.
+You'll need a Gemini API key. The `context/` directory (mounted read-only into agent-browser) should contain your resume PDF and any background context files — see `.env.example` for the full list of configuration options.
+
+## Testing
+
+There are no unit tests in this repository. The safety mechanisms are architectural: honesty constraints live in system prompts, the approval workflow requires human confirmation, and emergency controls can halt the pipeline. This is a deliberate trade-off — faster iteration on constraint design at the cost of test coverage.
 
 ## Known Issues
 
@@ -172,9 +165,7 @@ You'll need a Gemini API key. Everything else runs locally via Docker.
 
 **Duplicate scraping.** jobspy occasionally returns the same listing under different IDs. The dedup logic catches URL-level duplicates but misses same-job-different-URL cases.
 
-**iCIMS and BambooHR adapters are thin.** Detection works, but form filling falls back to generic field matching. These two ATS platforms have non-standard field naming that would need dedicated adapters.
-
-**Billing disabled.** The Cloud Run services are currently not running (GCP billing paused). The code works — the infrastructure just isn't live. All metrics (1,976 jobs, 247 scored, 52 applications) reflect the last active state.
+**iCIMS and BambooHR adapters are thin.** Detection works, but these two ATS platforms fall back to screenshots for manual review. Their non-standard field naming would need dedicated adapter functions.
 
 **Cover letter quality variance.** Some generated letters are genuinely good. Others are formulaic. The 4-paragraph constraint helps consistency but can make letters feel templated. A future version would benefit from few-shot examples per company type.
 
