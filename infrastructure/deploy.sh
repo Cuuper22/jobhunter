@@ -32,7 +32,7 @@ gcloud run deploy agent-browser \
   --max-instances 3 \
   --timeout 900 \
   --cpu-boost \
-  --set-env-vars "PROJECT_ID=$PROJECT_ID,REGION=$REGION,SCREENSHOTS_BUCKET=${PROJECT_ID}-screenshots,APPLICANT_EMAIL=APPLICANT_EMAIL_REDACTED,APPLICANT_PHONE=PHONE_REDACTED" \
+  --set-env-vars "PROJECT_ID=$PROJECT_ID,REGION=$REGION,SCREENSHOTS_BUCKET=${PROJECT_ID}-screenshots,APPLICANT_EMAIL=${APPLICANT_EMAIL},APPLICANT_PHONE=${APPLICANT_PHONE}" \
   --set-secrets "GEMINI_API_KEY=gemini-api-key:latest" \
   --no-allow-unauthenticated
 
