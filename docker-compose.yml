@@ -27,8 +27,8 @@ services:
       - CONTEXT_DIR=/app/context
       - SKIP_AUTH=true
       - PORT=8080
-      - APPLICANT_EMAIL=APPLICANT_EMAIL_REDACTED
-      - APPLICANT_PHONE=PHONE_REDACTED
+      - APPLICANT_EMAIL=${APPLICANT_EMAIL}
+      - APPLICANT_PHONE=${APPLICANT_PHONE}
     depends_on:
       - firestore-emulator
 

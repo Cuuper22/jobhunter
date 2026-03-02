@@ -20,11 +20,28 @@ out/
 .vscode/
 .idea/
 
+# Development logs (contain secrets)
+DEVELOPMENT_LOG*.md
+CLAUDE.md
+
 # GCP
 *.json
 !firebase.json
 !package.json
 !tsconfig.json
+*-service-account.json
+*-sa-key.json
+*.p12
+
+# Data dumps
+firestore_dump*
+
+# Personal documents
+*.pdf
+*.tex
+
+# Screenshots (may contain PII)
+screenshots/
 
 # OS
 .DS_Store

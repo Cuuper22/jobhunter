@@ -33,10 +33,10 @@ app = FastAPI(title="JobHunter Agent-Browser")
 
 # Default form data for applications (loaded from env/config)
 DEFAULT_FORM_DATA = {
-    "first_name": os.getenv("APPLICANT_FIRST_NAME", "Yousef"),
-    "last_name": os.getenv("APPLICANT_LAST_NAME", "Anas"),
-    "email": os.getenv("APPLICANT_EMAIL", "APPLICANT_EMAIL_REDACTED"),
-    "phone": os.getenv("APPLICANT_PHONE", "PHONE_REDACTED"),
+    "first_name": os.getenv("APPLICANT_FIRST_NAME", ""),
+    "last_name": os.getenv("APPLICANT_LAST_NAME", ""),
+    "email": os.getenv("APPLICANT_EMAIL", ""),
+    "phone": os.getenv("APPLICANT_PHONE", ""),
     "resume_path": os.getenv("RESUME_PATH", "/app/context/resume.pdf"),
 }
 
