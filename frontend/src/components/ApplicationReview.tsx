@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { api } from "../lib/api";
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,10 @@ function CollapsibleSection({
 // Single application card
 // ---------------------------------------------------------------------------
 
-function AppCard({
+// ⚡ Bolt: Wrapped AppCard in React.memo to prevent unnecessary re-renders
+// when the parent ApplicationReview component auto-refreshes every 15s.
+// Expected Impact: Reduces re-renders of expensive form components significantly.
+const AppCard = memo(function AppCard({
   app,
   onDismiss,
 }: {
@@ -450,7 +453,16 @@ function AppCard({
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // ⚡ Bolt: Custom equality check to prevent re-renders when API polling returns new object references
+  // Only re-render if the core data we display/edit has actually changed.
+  return (
+    prevProps.app.id === nextProps.app.id &&
+    prevProps.app.status === nextProps.app.status &&
+    prevProps.app.cover_letter === nextProps.app.cover_letter &&
+    prevProps.app.cover_letter_edited === nextProps.app.cover_letter_edited
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -479,9 +491,11 @@ export default function ApplicationReview() {
     return () => clearInterval(interval);
   }, [refresh]);
 
-  const dismiss = (id: string) => {
+  // ⚡ Bolt: Wrapped dismiss in useCallback to preserve its function reference.
+  // This prevents breaking the React.memo optimization on AppCard during re-renders.
+  const dismiss = useCallback((id: string) => {
     setApps((prev) => prev.filter((a) => a.id !== id));
-  };
+  }, []);
 
   if (initialLoading) {
     return (
