@@ -1,0 +1,3 @@
+## 2025-03-06 - [Offloading synchronous I/O operations with asyncio.to_thread]
+**Learning:** In FastAPI async endpoints, calling synchronous, blocking operations (like `Firestore.get()`) without offloading blocks the event loop. When fetching data from multiple sources sequentially, the network latencies add up. The API Gateway `/api/stats` endpoint previously fetched four independent counts sequentially from Firestore.
+**Action:** Used `asyncio.to_thread` along with `asyncio.gather` to concurrently execute synchronous `.get()` queries in background threads. This pattern significantly speeds up endpoint response times without rewriting synchronous client libraries into async libraries.
