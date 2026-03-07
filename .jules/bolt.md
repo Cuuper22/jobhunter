@@ -1,0 +1,3 @@
+## 2024-05-20 - [Asyncio Event Loop Blocking with Synchronous Firestore Queries]
+**Learning:** [Synchronous Google Cloud Firestore queries via `.get()` or `.count().get()` inside FastAPI asynchronous endpoints (`async def`) will block the event loop, severely degrading performance under concurrent load.]
+**Action:** [Always offload synchronous I/O operations inside `async def` functions using `await asyncio.to_thread(func_name)` to maintain the non-blocking nature of the event loop. If there are multiple independent operations, they can be grouped via `asyncio.gather` inside the offloaded thread or as separate async tasks.]
