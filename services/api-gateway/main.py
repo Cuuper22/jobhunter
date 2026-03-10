@@ -52,21 +52,38 @@ async def health():
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
     from shared.firestore_client import db
-    from google.cloud.firestore_v1 import aggregation
+    import asyncio
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # ⚡ Bolt Optimization: Offload synchronous Firestore count queries to threads
+    # and execute them concurrently with asyncio.gather to prevent blocking the
+    # FastAPI event loop and significantly reduce endpoint latency.
+    def get_jobs_count():
+        return db.collection("jobs").count().get()[0][0].value
+
+    def get_apps_count():
+        return db.collection("applications").count().get()[0][0].value
+
+    def get_pending_count():
+        return (
+            db.collection("applications")
+            .where("status", "==", "pending_approval")
+            .count()
+            .get()[0][0].value
+        )
+
+    def get_submitted_count():
+        return (
+            db.collection("applications")
+            .where("status", "==", "submitted")
+            .count()
+            .get()[0][0].value
+        )
+
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(get_jobs_count),
+        asyncio.to_thread(get_apps_count),
+        asyncio.to_thread(get_pending_count),
+        asyncio.to_thread(get_submitted_count),
     )
 
     return {
@@ -81,13 +98,19 @@ async def stats(user=Depends(verify_firebase_token)):
 async def recent_logs(limit: int = 50, user=Depends(verify_firebase_token)):
     """Get recent activity logs for the dashboard log stream."""
     from shared.firestore_client import db
+    import asyncio
 
-    docs = (
-        db.collection("logs")
-        .order_by("timestamp", direction="DESCENDING")
-        .limit(limit)
-        .get()
-    )
+    # ⚡ Bolt Optimization: Offload synchronous Firestore query to a thread
+    # to prevent blocking the FastAPI event loop during I/O.
+    def get_recent_logs():
+        return (
+            db.collection("logs")
+            .order_by("timestamp", direction="DESCENDING")
+            .limit(limit)
+            .get()
+        )
+
+    docs = await asyncio.to_thread(get_recent_logs)
     return [
         {k: (None if isinstance(v, float) and (math.isnan(v) or math.isinf(v)) else v)
          for k, v in doc.to_dict().items()}
