@@ -51,22 +51,20 @@ async def health():
 @app.get("/api/stats")
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
+    import asyncio
     from shared.firestore_client import db
-    from google.cloud.firestore_v1 import aggregation
+    from google.cloud.firestore_v1 import FieldFilter
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    def get_count(query):
+        return query.count().get()[0][0].value
+
+    # Run all synchronous count queries concurrently in separate threads
+    # to avoid blocking the main event loop.
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(get_count, db.collection("jobs")),
+        asyncio.to_thread(get_count, db.collection("applications")),
+        asyncio.to_thread(get_count, db.collection("applications").where(filter=FieldFilter("status", "==", "pending_approval"))),
+        asyncio.to_thread(get_count, db.collection("applications").where(filter=FieldFilter("status", "==", "submitted")))
     )
 
     return {
