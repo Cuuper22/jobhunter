@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -54,26 +55,25 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # ⚡ Bolt: Offload and parallelize synchronous Firestore queries.
+    # Runs the sequential I/O operations concurrently in separate threads
+    # to avoid blocking the Uvicorn event loop, significantly reducing latency.
+    results = await asyncio.gather(
+        asyncio.to_thread(lambda: db.collection("jobs").count().get()),
+        asyncio.to_thread(lambda: db.collection("applications").count().get()),
+        asyncio.to_thread(lambda: db.collection("applications")
+                                    .where("status", "==", "pending_approval")
+                                    .count().get()),
+        asyncio.to_thread(lambda: db.collection("applications")
+                                    .where("status", "==", "submitted")
+                                    .count().get())
     )
 
     return {
-        "total_jobs_scraped": jobs_count,
-        "total_applications": apps_count,
-        "pending_approval": pending_count,
-        "submitted": submitted_count,
+        "total_jobs_scraped": results[0][0][0].value,
+        "total_applications": results[1][0][0].value,
+        "pending_approval": results[2][0][0].value,
+        "submitted": results[3][0][0].value,
     }
 
 
@@ -82,8 +82,9 @@ async def recent_logs(limit: int = 50, user=Depends(verify_firebase_token)):
     """Get recent activity logs for the dashboard log stream."""
     from shared.firestore_client import db
 
-    docs = (
-        db.collection("logs")
+    # ⚡ Bolt: Offload synchronous Firestore query to thread pool
+    docs = await asyncio.to_thread(
+        lambda: db.collection("logs")
         .order_by("timestamp", direction="DESCENDING")
         .limit(limit)
         .get()
