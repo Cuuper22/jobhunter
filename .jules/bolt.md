@@ -1,0 +1,3 @@
+## 2024-05-24 - Firestore Synchronous Queries in Async Endpoints
+**Learning:** In the FastAPI backend, using synchronous Google Cloud Firestore SDK calls like `db.collection("...").count().get()` directly inside `async def` endpoints will block the main event loop, causing severe latency degradation when multiple endpoints are hit simultaneously or when one endpoint executes multiple queries sequentially (N+1-like behavior).
+**Action:** Always offload synchronous Firestore queries (or any synchronous I/O, like GCS uploads/local file writes) to worker threads using `asyncio.to_thread` when executing inside `async` route handlers. Use `asyncio.gather` to perform multiple independent I/O tasks concurrently to drastically lower total response times.
