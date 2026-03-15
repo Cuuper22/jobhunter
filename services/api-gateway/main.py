@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -54,19 +55,23 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # Run independent synchronous Firestore count queries concurrently
+    # Offloading to threads prevents blocking the asyncio event loop
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(lambda: db.collection("jobs").count().get()[0][0].value),
+        asyncio.to_thread(lambda: db.collection("applications").count().get()[0][0].value),
+        asyncio.to_thread(
+            lambda: db.collection("applications")
+            .where("status", "==", "pending_approval")
+            .count()
+            .get()[0][0].value
+        ),
+        asyncio.to_thread(
+            lambda: db.collection("applications")
+            .where("status", "==", "submitted")
+            .count()
+            .get()[0][0].value
+        ),
     )
 
     return {
@@ -82,8 +87,9 @@ async def recent_logs(limit: int = 50, user=Depends(verify_firebase_token)):
     """Get recent activity logs for the dashboard log stream."""
     from shared.firestore_client import db
 
-    docs = (
-        db.collection("logs")
+    # Offload the synchronous get() operation to avoid blocking the event loop
+    docs = await asyncio.to_thread(
+        lambda: db.collection("logs")
         .order_by("timestamp", direction="DESCENDING")
         .limit(limit)
         .get()
