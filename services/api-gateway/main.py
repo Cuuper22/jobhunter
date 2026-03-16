@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -52,28 +53,27 @@ async def health():
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
     from shared.firestore_client import db
-    from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
+    # Offload synchronous Firestore queries to a background thread to prevent blocking
+    # the event loop and gather them concurrently to reduce overall latency.
+    jobs_task = asyncio.to_thread(lambda: db.collection("jobs").count().get())
+    apps_task = asyncio.to_thread(lambda: db.collection("applications").count().get())
+    pending_task = asyncio.to_thread(
+        lambda: db.collection("applications").where("status", "==", "pending_approval").count().get()
     )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    submitted_task = asyncio.to_thread(
+        lambda: db.collection("applications").where("status", "==", "submitted").count().get()
+    )
+
+    jobs_res, apps_res, pending_res, submitted_res = await asyncio.gather(
+        jobs_task, apps_task, pending_task, submitted_task
     )
 
     return {
-        "total_jobs_scraped": jobs_count,
-        "total_applications": apps_count,
-        "pending_approval": pending_count,
-        "submitted": submitted_count,
+        "total_jobs_scraped": jobs_res[0][0].value,
+        "total_applications": apps_res[0][0].value,
+        "pending_approval": pending_res[0][0].value,
+        "submitted": submitted_res[0][0].value,
     }
 
 
