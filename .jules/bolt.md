@@ -1,0 +1,3 @@
+## 2024-03-17 - FastAPI Synchronous I/O Blocking Event Loop
+**Learning:** Found synchronous Firestore `.count().get()` aggregation queries running sequentially directly inside an `async def` FastAPI endpoint (`/api/stats`). This not only causes the request to take the sum of all 4 network round trips, but it fully blocks the main thread's asyncio event loop, starving other requests.
+**Action:** When working in FastAPI `async def` endpoints, always offload synchronous I/O (like standard Firestore sync client calls) to a separate thread using `asyncio.to_thread`. Use `asyncio.gather` to execute independent queries concurrently, reducing total latency to the single slowest query.

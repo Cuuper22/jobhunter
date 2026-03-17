@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -52,28 +53,25 @@ async def health():
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
     from shared.firestore_client import db
-    from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
+    # ⚡ Bolt: Execute synchronous Firestore `.count().get()` queries concurrently
+    # to avoid blocking the event loop and reduce total request latency.
+    # The Firestore gRPC client is thread-safe.
+    from google.cloud.firestore_v1 import FieldFilter
+
+    results = await asyncio.gather(
+        asyncio.to_thread(lambda: db.collection("jobs").count().get()),
+        asyncio.to_thread(lambda: db.collection("applications").count().get()),
+        asyncio.to_thread(lambda: db.collection("applications").where(filter=FieldFilter("status", "==", "pending_approval")).count().get()),
+        asyncio.to_thread(lambda: db.collection("applications").where(filter=FieldFilter("status", "==", "submitted")).count().get()),
     )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
-    )
+    jobs_count_result, apps_count_result, pending_count_result, submitted_count_result = results
 
     return {
-        "total_jobs_scraped": jobs_count,
-        "total_applications": apps_count,
-        "pending_approval": pending_count,
-        "submitted": submitted_count,
+        "total_jobs_scraped": jobs_count_result[0][0].value,
+        "total_applications": apps_count_result[0][0].value,
+        "pending_approval": pending_count_result[0][0].value,
+        "submitted": submitted_count_result[0][0].value,
     }
 
 
