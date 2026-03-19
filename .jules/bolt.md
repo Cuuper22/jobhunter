@@ -1,0 +1,3 @@
+## 2024-05-24 - [Firestore Aggregation Query Optimization]
+**Learning:** Synchronous gRPC Firestore queries like `.count().get()` within FastAPI asynchronous routes block the main event loop and cause total request time to scale linearly with the number of queries. The `google-cloud-firestore` Python client uses gRPC channels which are thread-safe.
+**Action:** Always offload synchronous Firestore queries inside `async def` endpoints using `asyncio.to_thread`. When there are multiple independent queries, run them concurrently using `asyncio.gather` to reduce the total response time to the maximum latency of a single query.

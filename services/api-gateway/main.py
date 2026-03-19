@@ -51,22 +51,40 @@ async def health():
 @app.get("/api/stats")
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
+    import asyncio
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # ⚡ Bolt: Run independent synchronous gRPC Firestore queries concurrently
+    # Offloading to threads prevents blocking the main event loop and
+    # reduces total response time from O(n) to O(1) query latency.
+    def get_jobs_count():
+        return db.collection("jobs").count().get()[0][0].value
+
+    def get_apps_count():
+        return db.collection("applications").count().get()[0][0].value
+
+    def get_pending_count():
+        return (
+            db.collection("applications")
+            .where("status", "==", "pending_approval")
+            .count()
+            .get()[0][0].value
+        )
+
+    def get_submitted_count():
+        return (
+            db.collection("applications")
+            .where("status", "==", "submitted")
+            .count()
+            .get()[0][0].value
+        )
+
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(get_jobs_count),
+        asyncio.to_thread(get_apps_count),
+        asyncio.to_thread(get_pending_count),
+        asyncio.to_thread(get_submitted_count),
     )
 
     return {
