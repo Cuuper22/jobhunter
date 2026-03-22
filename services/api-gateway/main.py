@@ -8,6 +8,7 @@ import logging
 import math
 import os
 import sys
+import asyncio
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,20 +55,25 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
+    # Run independent synchronous aggregation queries concurrently in threads
+    # to avoid blocking the event loop and reduce total latency.
+    results = await asyncio.gather(
+        asyncio.to_thread(lambda: db.collection("jobs").count().get()[0][0].value),
+        asyncio.to_thread(lambda: db.collection("applications").count().get()[0][0].value),
+        asyncio.to_thread(
+            lambda: db.collection("applications")
+            .where("status", "==", "pending_approval")
+            .count()
+            .get()[0][0].value
+        ),
+        asyncio.to_thread(
+            lambda: db.collection("applications")
+            .where("status", "==", "submitted")
+            .count()
+            .get()[0][0].value
+        )
     )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
-    )
+    jobs_count, apps_count, pending_count, submitted_count = results
 
     return {
         "total_jobs_scraped": jobs_count,
