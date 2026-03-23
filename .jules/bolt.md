@@ -1,0 +1,3 @@
+## 2024-10-24 - Concurrent Firestore count queries in stats endpoint
+**Learning:** Sequential synchronous Firestore queries (`.count().get()`) inside FastAPI asynchronous routes block the event loop and accumulate network latency. The `google-cloud-firestore` gRPC channels are thread-safe, making it perfectly safe to parallelize these calls.
+**Action:** When an async endpoint needs to make multiple independent synchronous Firestore calls (like aggregations or getting multiple separate documents), always offload them to a thread pool using `asyncio.to_thread` and run them concurrently using `asyncio.gather`. This significantly reduces the total response time to the maximum of the individual query delays rather than their sum.
