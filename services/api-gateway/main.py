@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -54,26 +55,31 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # ⚡ Bolt: Parallelize synchronous Firestore queries using asyncio.to_thread
+    # This prevents blocking the event loop and significantly speeds up the dashboard load time
+    # as these 4 independent aggregation queries can be executed concurrently.
+    jobs_task, apps_task, pending_task, submitted_task = await asyncio.gather(
+        asyncio.to_thread(lambda: db.collection("jobs").count().get()),
+        asyncio.to_thread(lambda: db.collection("applications").count().get()),
+        asyncio.to_thread(
+            lambda: db.collection("applications")
+            .where("status", "==", "pending_approval")
+            .count()
+            .get()
+        ),
+        asyncio.to_thread(
+            lambda: db.collection("applications")
+            .where("status", "==", "submitted")
+            .count()
+            .get()
+        ),
     )
 
     return {
-        "total_jobs_scraped": jobs_count,
-        "total_applications": apps_count,
-        "pending_approval": pending_count,
-        "submitted": submitted_count,
+        "total_jobs_scraped": jobs_task[0][0].value,
+        "total_applications": apps_task[0][0].value,
+        "pending_approval": pending_task[0][0].value,
+        "submitted": submitted_task[0][0].value,
     }
 
 
