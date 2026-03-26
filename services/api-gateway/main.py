@@ -51,29 +51,27 @@ async def health():
 @app.get("/api/stats")
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
+    import asyncio
     from shared.firestore_client import db
-    from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # Helper function to execute a count query and extract the value
+    def get_count(query):
+        return query.count().get()[0][0].value
+
+    # Execute all four synchronous Firestore count queries concurrently in separate threads
+    # to avoid blocking the FastAPI event loop and to reduce overall response time.
+    results = await asyncio.gather(
+        asyncio.to_thread(get_count, db.collection("jobs")),
+        asyncio.to_thread(get_count, db.collection("applications")),
+        asyncio.to_thread(get_count, db.collection("applications").where("status", "==", "pending_approval")),
+        asyncio.to_thread(get_count, db.collection("applications").where("status", "==", "submitted"))
     )
 
     return {
-        "total_jobs_scraped": jobs_count,
-        "total_applications": apps_count,
-        "pending_approval": pending_count,
-        "submitted": submitted_count,
+        "total_jobs_scraped": results[0],
+        "total_applications": results[1],
+        "pending_approval": results[2],
+        "submitted": results[3],
     }
 
 
