@@ -1,0 +1,3 @@
+## 2024-05-24 - Firestore Synchronous Queries in Async Fast API Endpoints
+**Learning:** Sequential synchronous queries to Firestore (e.g. `db.collection("jobs").count().get()`) inside an `async def` FastAPI router endpoint will block the event loop, causing accumulating latency and potential performance bottlenecks.
+**Action:** When multiple independent Firestore queries are executed inside an asynchronous endpoint, wrap each query using `asyncio.to_thread` and execute them concurrently via `asyncio.gather`. This utilizes threads to prevent blocking the event loop and speeds up the endpoint latency significantly.
