@@ -1,5 +1,6 @@
 """Job listing endpoints."""
 
+import asyncio
 import math
 
 from fastapi import APIRouter, Depends, Query
@@ -36,14 +37,15 @@ async def list_jobs(
     if source:
         query = query.where(filter=FieldFilter("source", "==", source))
 
-    docs = query.limit(limit).get()
+    docs = await asyncio.to_thread(query.limit(limit).get)
     return [_sanitize(doc.to_dict()) for doc in docs]
 
 
 @router.get("/{job_id}")
 async def get_job(job_id: str, user=Depends(verify_firebase_token)):
     """Get a single job by ID."""
-    doc = db.collection("jobs").document(job_id).get()
+    doc_ref = db.collection("jobs").document(job_id)
+    doc = await asyncio.to_thread(doc_ref.get)
     if not doc.exists:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Job not found")
