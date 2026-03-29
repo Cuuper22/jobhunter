@@ -42,6 +42,26 @@ def save_job(job: Job) -> str:
     return doc_ref.id
 
 
+def save_jobs(jobs: list[Job]) -> list[str]:
+    """Save multiple jobs in batches (max 500 per batch). Returns document IDs."""
+    job_ids = []
+
+    # Firestore limits batch writes to 500 operations
+    for i in range(0, len(jobs), 500):
+        batch = db.batch()
+        batch_jobs = jobs[i:i+500]
+
+        for job in batch_jobs:
+            doc_ref = db.collection("jobs").document()
+            job.id = doc_ref.id
+            job_ids.append(job.id)
+            batch.set(doc_ref, job.model_dump(mode="json"))
+
+        batch.commit()
+
+    return job_ids
+
+
 def get_job(job_id: str) -> Optional[Job]:
     doc = db.collection("jobs").document(job_id).get()
     return Job(**doc.to_dict()) if doc.exists else None
@@ -56,6 +76,32 @@ def job_exists(url: str) -> bool:
         .get()
     )
     return len(docs) > 0
+
+
+def get_existing_job_urls(urls: set[str]) -> set[str]:
+    """Check which URLs already exist in the database.
+
+    Uses 'in' query in batches of 30 (Firestore limit for 'in' queries).
+    """
+    urls_list = list(urls)
+    existing_urls = set()
+
+    for i in range(0, len(urls_list), 30):
+        batch_urls = urls_list[i:i+30]
+        if not batch_urls:
+            continue
+
+        docs = (
+            db.collection("jobs")
+            .where(filter=FieldFilter("url", "in", batch_urls))
+            .select(["url"])  # Only fetch the URL field to save bandwidth
+            .get()
+        )
+
+        for doc in docs:
+            existing_urls.add(doc.to_dict().get("url"))
+
+    return existing_urls
 
 
 def update_job_score(job_id: str, score: int, reasoning: str):
