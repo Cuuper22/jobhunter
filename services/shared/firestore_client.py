@@ -42,9 +42,43 @@ def save_job(job: Job) -> str:
     return doc_ref.id
 
 
+def save_jobs(jobs: list[Job]) -> list[Job]:
+    """Save multiple jobs using batch writes."""
+    for i in range(0, len(jobs), 500):
+        chunk = jobs[i:i+500]
+        if not chunk:
+            continue
+        batch = db.batch()
+        for job in chunk:
+            doc_ref = db.collection("jobs").document()
+            job.id = doc_ref.id
+            batch.set(doc_ref, job.model_dump(mode="json"))
+        batch.commit()
+    return jobs
+
+
 def get_job(job_id: str) -> Optional[Job]:
     doc = db.collection("jobs").document(job_id).get()
     return Job(**doc.to_dict()) if doc.exists else None
+
+
+def get_existing_jobs(urls: list[str]) -> set[str]:
+    """Check which job URLs have already been scraped in bulk (dedup)."""
+    existing = set()
+    for i in range(0, len(urls), 30):
+        chunk = urls[i:i+30]
+        if not chunk:
+            continue
+        docs = (
+            db.collection("jobs")
+            .where(filter=FieldFilter("url", "in", chunk))
+            .get()
+        )
+        for doc in docs:
+            d = doc.to_dict()
+            if d and "url" in d:
+                existing.add(d["url"])
+    return existing
 
 
 def job_exists(url: str) -> bool:

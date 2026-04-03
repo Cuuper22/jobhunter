@@ -1,0 +1,3 @@
+## 2024-05-24 - [Firestore N+1 Mitigation]
+**Learning:** Checking for duplicate URLs sequentially during job scraping leads to a severe N+1 problem, significantly slowing down the scraping process. Firestore has hard limits for query conditions (`in` queries are limited to 30 items) and batch writes (limited to 500 operations).
+**Action:** Always process data in batches when fetching or writing multiple documents to Firestore. Gather the IDs/URLs first, chunk them according to Firestore limits (e.g., 30 for `in` queries, 500 for `batch().set()`), and use bulk operations. Ensure any scratchpad files created during local testing are removed before submission.
