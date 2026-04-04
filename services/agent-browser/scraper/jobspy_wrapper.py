@@ -5,7 +5,7 @@ from datetime import datetime
 
 from jobspy import scrape_jobs
 
-from shared.firestore_client import job_exists, save_job, log
+from shared.firestore_client import bulk_job_exists, save_jobs, log
 from shared.models import Job, JobSource, LogLevel
 from agent_browser.scraper.config import SearchConfig, DEFAULT_SEARCHES
 
@@ -47,10 +47,16 @@ def run_search(config: SearchConfig) -> list[Job]:
         logger.info("No results returned")
         return []
 
-    new_jobs = []
+    # Extract URLs for bulk check
+    urls_to_check = [str(url) for url in df["job_url"].dropna().unique() if str(url)]
+
+    # Check which ones already exist
+    existing_urls = bulk_job_exists(urls_to_check) if urls_to_check else set()
+
+    jobs_to_save = []
     for _, row in df.iterrows():
         url = str(row.get("job_url", ""))
-        if not url or job_exists(url):
+        if not url or url in existing_urls:
             continue
 
         job = Job(
@@ -66,17 +72,20 @@ def run_search(config: SearchConfig) -> list[Job]:
             is_remote=bool(row.get("is_remote", False)),
         )
 
-        job_id = save_job(job)
-        job.id = job_id
-        new_jobs.append(job)
+        # Deduplicate internally within the new scrape batch
+        existing_urls.add(url)
+        jobs_to_save.append(job)
 
-    logger.info(f"Found {len(new_jobs)} new jobs (filtered {len(df) - len(new_jobs)} duplicates)")
+    if jobs_to_save:
+        save_jobs(jobs_to_save)
+
+    logger.info(f"Found {len(jobs_to_save)} new jobs (filtered {len(df) - len(jobs_to_save)} duplicates)")
     log(
-        f"Scraped '{config.search_term}': {len(new_jobs)} new, {len(df)} total",
+        f"Scraped '{config.search_term}': {len(jobs_to_save)} new, {len(df)} total",
         level=LogLevel.SUCCESS,
         metadata={"search_term": config.search_term, "location": config.location},
     )
-    return new_jobs
+    return jobs_to_save
 
 
 def run_all_searches(searches: list[SearchConfig] | None = None) -> list[Job]:
