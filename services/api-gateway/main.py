@@ -54,19 +54,17 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    import asyncio
+
+    def _get_count(query):
+        return query.count().get()[0][0].value
+
+    # Performance: Run synchronous gRPC count queries in parallel using thread pool
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(_get_count, db.collection("jobs")),
+        asyncio.to_thread(_get_count, db.collection("applications")),
+        asyncio.to_thread(_get_count, db.collection("applications").where("status", "==", "pending_approval")),
+        asyncio.to_thread(_get_count, db.collection("applications").where("status", "==", "submitted"))
     )
 
     return {
