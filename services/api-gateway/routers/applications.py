@@ -1,5 +1,6 @@
 """Application management endpoints — approve, reject, edit cover letters."""
 
+import asyncio
 import math
 from datetime import datetime
 
@@ -50,25 +51,25 @@ async def list_applications(
     if status:
         query = query.where(filter=FieldFilter("status", "==", status))
 
-    docs = query.limit(limit).get()
+    docs = await asyncio.to_thread(query.limit(limit).get)
     return [_sanitize(doc.to_dict()) for doc in docs]
 
 
 @router.get("/pending")
 async def list_pending(user=Depends(verify_firebase_token)):
     """Get all applications awaiting approval."""
-    docs = (
+    query = (
         db.collection("applications")
         .where(filter=FieldFilter("status", "==", ApplicationStatus.PENDING_APPROVAL.value))
         .order_by("created_at")
-        .get()
     )
+    docs = await asyncio.to_thread(query.get)
     return [_sanitize(doc.to_dict()) for doc in docs]
 
 
 @router.get("/{app_id}")
 async def get_application(app_id: str, user=Depends(verify_firebase_token)):
-    doc = db.collection("applications").document(app_id).get()
+    doc = await asyncio.to_thread(db.collection("applications").document(app_id).get)
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Application not found")
     return _sanitize(doc.to_dict())
@@ -81,7 +82,7 @@ async def update_application(
     user=Depends(verify_firebase_token),
 ):
     """Partial update — save edited cover letter, form fields, outreach email before approval."""
-    doc = db.collection("applications").document(app_id).get()
+    doc = await asyncio.to_thread(db.collection("applications").document(app_id).get)
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Application not found")
 
@@ -92,7 +93,7 @@ async def update_application(
         if value is not None:
             updates[field] = value
 
-    db.collection("applications").document(app_id).update(updates)
+    await asyncio.to_thread(db.collection("applications").document(app_id).update, updates)
     return {"status": "updated", "application_id": app_id, "fields_updated": [k for k in updates if k != "updated_at"]}
 
 
@@ -103,7 +104,7 @@ async def approve_application(
     user=Depends(verify_firebase_token),
 ):
     """Approve an application for submission. Optionally update the cover letter."""
-    doc = db.collection("applications").document(app_id).get()
+    doc = await asyncio.to_thread(db.collection("applications").document(app_id).get)
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Application not found")
 
