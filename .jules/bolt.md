@@ -1,0 +1,3 @@
+## 2024-05-18 - Unblocking the FastAPI Event Loop with asyncio.to_thread
+**Learning:** In the `api-gateway` service, the routers (`applications.py` and `jobs.py`) were making direct synchronous Firestore calls (like `.get()` and `.update()`) inside `async def` endpoints. While Google Cloud Firestore calls are synchronous, putting them directly in FastAPI's async routes blocks the main event loop, significantly degrading performance under load.
+**Action:** Always wrap synchronous I/O operations (like `google.cloud.firestore` synchronous client calls) inside `asyncio.to_thread()` when used within `async def` FastAPI route handlers to maintain high concurrency. Add clear comments explaining the performance optimization.
