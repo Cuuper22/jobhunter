@@ -1,0 +1,4 @@
+
+## 2024-04-12 - Synchronous Firestore Calls Inside Async FastAPI Routes
+**Learning:** The Google Cloud Firestore Python synchronous client methods (like `.get()`) block the main event loop when used directly inside a FastAPI `async def` route endpoint. Making sequential blocking calls drastically increases API latency under load. However, since the client uses gRPC under the hood and is safe to call from background threads concurrently, these calls can be parallelized. When creating mock modules to test subpackages like `fastapi.middleware.cors`, they must be explicitly added to `sys.modules` individually.
+**Action:** When working on FastAPI endpoints doing multiple synchronous I/O operations (like Firestore queries), always use `asyncio.to_thread` and `asyncio.gather` to execute them concurrently without blocking the event loop. Always explicitly mock deeply nested module paths in standalone verification scripts.
