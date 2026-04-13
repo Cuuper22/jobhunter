@@ -1,0 +1,4 @@
+## 2024-04-13 - Batch Firestore Requests in Scraper Loop
+
+**Learning:** When performing bulk duplicate checks and saving objects into Firestore during scrape loops, executing queries and writes per item creates a severe N+1 problem. Firestore imposes specific limits: batch writes support up to 500 operations per request, and `in` filter queries strictly limit to 30 elements. Chunking operations according to these limits is critical to resolve the performance bottleneck safely. Moreover, when writing large volumes of scraped items simultaneously, intra-batch deduplication using a localized Python `set()` is necessary to avoid duplicating records that appear repeatedly in the same execution run.
+**Action:** When handling bulk inserts into Firestore, prefer `db.batch()` chunked by 500 and `in` queries chunked by 30, and always locally deduplicate prior to committing the batch.
