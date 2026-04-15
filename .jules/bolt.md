@@ -1,0 +1,3 @@
+## 2024-05-24 - Async API Calls Blocking Event Loop
+**Learning:** The FastAPI endpoints in `services/api-gateway/routers/` use synchronous Firestore calls like `db.collection(...).get()` inside `async def` routes. According to the `agent-browser` memory and Python asyncio best practices, these block the event loop, causing performance bottlenecks under concurrent load. The `google-cloud-firestore` Python client uses gRPC channels which are thread-safe. This makes it safe to parallelize synchronous database calls (like `.get()`) across multiple threads using `asyncio.to_thread` within FastAPI asynchronous routes.
+**Action:** Wrap synchronous Firestore operations (`.get()`, `.update()`) in `asyncio.to_thread()` within the async route handlers in the API gateway.
