@@ -1,0 +1,3 @@
+## 2025-04-17 - FastAPI Sync I/O Blocking
+**Learning:** Found a critical performance bottleneck in `services/api-gateway/main.py` where multiple synchronous Firestore queries (`.count().get()`) were being executed sequentially within an `async def` FastAPI route, blocking the event loop and compounding total response time. The Google Cloud Firestore python client uses gRPC channels which are thread-safe, making it safe to parallelize synchronous database calls across multiple threads.
+**Action:** Always offload synchronous I/O operations (like `db.collection().get()`) inside asynchronous FastAPI functions using `asyncio.to_thread()`, and use `asyncio.gather()` to run multiple independent queries concurrently.
