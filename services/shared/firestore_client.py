@@ -58,6 +58,40 @@ def job_exists(url: str) -> bool:
     return len(docs) > 0
 
 
+def get_existing_job_urls(urls: list[str]) -> set[str]:
+    """Check multiple job URLs at once (dedup) in batches of 30."""
+    existing = set()
+    for i in range(0, len(urls), 30):
+        chunk = urls[i:i+30]
+        if not chunk:
+            continue
+        docs = (
+            db.collection("jobs")
+            .where(filter=FieldFilter("url", "in", chunk))
+            .select(["url"])
+            .get()
+        )
+        for doc in docs:
+            d = doc.to_dict()
+            if d and "url" in d:
+                existing.add(d["url"])
+    return existing
+
+
+def save_jobs(jobs: list[Job]) -> None:
+    """Save multiple scraped jobs efficiently in batches (max 500 ops per batch)."""
+    for i in range(0, len(jobs), 500):
+        chunk = jobs[i:i+500]
+        if not chunk:
+            continue
+        batch = db.batch()
+        for job in chunk:
+            doc_ref = db.collection("jobs").document()
+            job.id = doc_ref.id
+            batch.set(doc_ref, job.model_dump(mode="json"))
+        batch.commit()
+
+
 def update_job_score(job_id: str, score: int, reasoning: str):
     db.collection("jobs").document(job_id).update({
         "fit_score": score,
