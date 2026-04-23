@@ -38,7 +38,7 @@ async def trigger_cycle(
     The agent-browser processes in the background (Cloud Run keeps the
     instance alive until the request completes).
     """
-    log("Scheduler triggered scrape-and-process cycle", level=LogLevel.INFO)
+    await asyncio.to_thread(log, "Scheduler triggered scrape-and-process cycle", level=LogLevel.INFO)
 
     # Fire and forget — don't wait for the full cycle
     asyncio.create_task(_fire_cycle(min_score))
@@ -64,12 +64,13 @@ async def _fire_cycle(min_score: int):
             resp.raise_for_status()
             data = resp.json()
 
-        log(
+        await asyncio.to_thread(
+            log,
             f"Scheduler cycle complete: {data.get('message', 'done')}",
             level=LogLevel.SUCCESS,
         )
     except Exception as e:
-        log(f"Scheduler cycle failed: {e}", level=LogLevel.ERROR)
+        await asyncio.to_thread(log, f"Scheduler cycle failed: {e}", level=LogLevel.ERROR)
         logger.error(f"Scheduler cycle error: {e}")
 
 

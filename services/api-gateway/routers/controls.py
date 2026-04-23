@@ -1,5 +1,6 @@
 """Emergency controls — pause, resume, purge queue."""
 
+import asyncio
 import os
 
 from fastapi import APIRouter, Depends
@@ -30,8 +31,8 @@ async def pause_queue(user=Depends(verify_firebase_token)):
         queue_path = client.queue_path(
             project=PROJECT_ID, location="us-central1", queue="job-applications"
         )
-        client.pause_queue(name=queue_path)
-        log("Queue paused by user", level=LogLevel.WARNING)
+        await asyncio.to_thread(client.pause_queue, name=queue_path)
+        await asyncio.to_thread(log, "Queue paused by user", level=LogLevel.WARNING)
         return ControlResponse(action="pause", success=True, message="Queue paused")
     except Exception as e:
         return ControlResponse(action="pause", success=False, message=str(e))
@@ -47,8 +48,8 @@ async def resume_queue(user=Depends(verify_firebase_token)):
         queue_path = client.queue_path(
             project=PROJECT_ID, location="us-central1", queue="job-applications"
         )
-        client.resume_queue(name=queue_path)
-        log("Queue resumed by user", level=LogLevel.INFO)
+        await asyncio.to_thread(client.resume_queue, name=queue_path)
+        await asyncio.to_thread(log, "Queue resumed by user", level=LogLevel.INFO)
         return ControlResponse(action="resume", success=True, message="Queue resumed")
     except Exception as e:
         return ControlResponse(action="resume", success=False, message=str(e))
@@ -64,9 +65,9 @@ async def emergency_stop(user=Depends(verify_firebase_token)):
         queue_path = client.queue_path(
             project=PROJECT_ID, location="us-central1", queue="job-applications"
         )
-        client.pause_queue(name=queue_path)
-        client.purge_queue(name=queue_path)
-        log("EMERGENCY STOP: Queue paused and purged", level=LogLevel.ERROR)
+        await asyncio.to_thread(client.pause_queue, name=queue_path)
+        await asyncio.to_thread(client.purge_queue, name=queue_path)
+        await asyncio.to_thread(log, "EMERGENCY STOP: Queue paused and purged", level=LogLevel.ERROR)
         return ControlResponse(
             action="emergency_stop", success=True,
             message="Queue paused and all pending tasks purged",
