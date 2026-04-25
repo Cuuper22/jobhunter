@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -52,21 +53,21 @@ async def health():
 async def stats(user=Depends(verify_firebase_token)):
     """Dashboard summary stats."""
     from shared.firestore_client import db
-    from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # Helper function to run the count query synchronously
+    def get_count(query) -> int:
+        return query.count().get()[0][0].value
+
+    # Parallelize the synchronous count queries using asyncio.gather and asyncio.to_thread
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(get_count, db.collection("jobs")),
+        asyncio.to_thread(get_count, db.collection("applications")),
+        asyncio.to_thread(
+            get_count, db.collection("applications").where("status", "==", "pending_approval")
+        ),
+        asyncio.to_thread(
+            get_count, db.collection("applications").where("status", "==", "submitted")
+        ),
     )
 
     return {
@@ -82,12 +83,17 @@ async def recent_logs(limit: int = 50, user=Depends(verify_firebase_token)):
     """Get recent activity logs for the dashboard log stream."""
     from shared.firestore_client import db
 
-    docs = (
-        db.collection("logs")
-        .order_by("timestamp", direction="DESCENDING")
-        .limit(limit)
-        .get()
-    )
+    def get_logs():
+        return (
+            db.collection("logs")
+            .order_by("timestamp", direction="DESCENDING")
+            .limit(limit)
+            .get()
+        )
+
+    # Wrap the synchronous get() call in asyncio.to_thread
+    docs = await asyncio.to_thread(get_logs)
+
     return [
         {k: (None if isinstance(v, float) and (math.isnan(v) or math.isinf(v)) else v)
          for k, v in doc.to_dict().items()}
