@@ -1,0 +1,3 @@
+## 2024-05-24 - Parallelizing Independent DB Calls in Async Handlers
+**Learning:** In modern async frameworks like FastAPI, sequentially awaiting or calling synchronous database client methods (like `google.cloud.firestore_v1` reads) in an `async def` route can significantly increase latency and block the ASGI event loop, defeating the purpose of asynchronous handlers.
+**Action:** When a route requires multiple independent database calls, refactor them into separate functions, wrap them with `asyncio.to_thread()`, and execute them concurrently using `asyncio.gather()`. This pattern effectively bounds the total latency to the slowest single query rather than the sum of all queries.
