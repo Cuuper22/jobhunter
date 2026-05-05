@@ -58,6 +58,43 @@ def job_exists(url: str) -> bool:
     return len(docs) > 0
 
 
+def get_existing_job_urls(urls: list[str]) -> set[str]:
+    """Check multiple job URLs at once (dedup). Uses chunked 'in' queries."""
+    if not urls:
+        return set()
+    existing = set()
+    # Firestore 'in' queries are limited to 30 elements
+    chunk_size = 30
+    for i in range(0, len(urls), chunk_size):
+        chunk = urls[i:i + chunk_size]
+        docs = (
+            db.collection("jobs")
+            .where(filter=FieldFilter("url", "in", chunk))
+            .get()
+        )
+        for doc in docs:
+            data = doc.to_dict()
+            if "url" in data:
+                existing.add(data["url"])
+    return existing
+
+
+def save_jobs_batch(jobs: list[Job]):
+    """Save multiple jobs using Firestore batched writes. Populates job.id."""
+    if not jobs:
+        return
+    # Firestore batches are limited to 500 operations
+    chunk_size = 500
+    for i in range(0, len(jobs), chunk_size):
+        chunk = jobs[i:i + chunk_size]
+        batch = db.batch()
+        for job in chunk:
+            doc_ref = db.collection("jobs").document()
+            job.id = doc_ref.id
+            batch.set(doc_ref, job.model_dump(mode="json"))
+        batch.commit()
+
+
 def update_job_score(job_id: str, score: int, reasoning: str):
     db.collection("jobs").document(job_id).update({
         "fit_score": score,
