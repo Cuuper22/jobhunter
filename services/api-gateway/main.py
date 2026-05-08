@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -54,19 +55,35 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # Define synchronous helper functions for Firestore aggregations
+    def _get_jobs_count():
+        return db.collection("jobs").count().get()[0][0].value
+
+    def _get_apps_count():
+        return db.collection("applications").count().get()[0][0].value
+
+    def _get_pending_count():
+        return (
+            db.collection("applications")
+            .where("status", "==", "pending_approval")
+            .count()
+            .get()[0][0].value
+        )
+
+    def _get_submitted_count():
+        return (
+            db.collection("applications")
+            .where("status", "==", "submitted")
+            .count()
+            .get()[0][0].value
+        )
+
+    # Parallelize the synchronous calls to prevent blocking the event loop
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(_get_jobs_count),
+        asyncio.to_thread(_get_apps_count),
+        asyncio.to_thread(_get_pending_count),
+        asyncio.to_thread(_get_submitted_count)
     )
 
     return {
