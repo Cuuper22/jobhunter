@@ -12,9 +12,9 @@ An AI job application system that scrapes, scores, and drafts, but will not subm
 
 ## Why
 
-I needed a job. I also needed to not manually apply to 200 listings a week.
+I needed a job. I also needed to not manually grind through hundreds of listings a week.
 
-So I built a system where AI agents scrape job boards, score each opportunity against my actual background, generate cover letters, and pre-fill application forms. The system runs every 3 hours on Cloud Run. It's found 1,976 jobs, scored 247 of them, and drafted 52 applications.
+So I built a system where AI agents scrape job boards, score each opportunity against my actual background, generate cover letters, and pre-fill application forms. The Cloud Run version ran every 3 hours. In its last active state, it had found 1,976 jobs, scored 247 of them, and drafted 52 applications.
 
 It has submitted zero.
 
