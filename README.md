@@ -1,6 +1,6 @@
 # jobhunter
 
-An AI job application system that scrapes, scores, and drafts — but won't submit without your say-so, and won't lie about your credentials.
+An AI job application system that scrapes, scores, and drafts, but will not submit without human approval and will not invent credentials.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Python](https://img.shields.io/badge/Python-3.11-blue.svg)
@@ -18,13 +18,13 @@ So I built a system where AI agents scrape job boards, score each opportunity ag
 
 It has submitted zero.
 
-Not because the automation is broken — the `/apply` endpoint exists, the Playwright form filler works, the ATS detection handles Greenhouse, Lever, and Workday. The system *can* submit. It doesn't, because the architecture requires a human to review every application and click "Approve" before anything goes out.
+Not because the automation is broken. The `/apply` endpoint exists, the Playwright form filler works, and the ATS detection handles Greenhouse, Lever, and Workday. The system *can* submit. It does not, because the architecture requires a human to review every application and click "Approve" before anything goes out.
 
-The more interesting constraint is honesty. The system prompts contain an explicit rule: "The candidate does NOT have a completed degree. Do NOT say 'Bachelor's degree.'" The AI could write more impressive cover letters by fabricating credentials. It's told not to. This is a real tension — the optimizer wants to maximize callbacks, the constraint says be truthful.
+The more interesting constraint is honesty. The AI could write more impressive cover letters by fabricating credentials, dates, tools, or availability. It is told not to. Each generation path is grounded against the source profile, and the prompts explicitly reject inflated claims. This is a real tension: the optimizer wants callbacks, the constraint says be truthful.
 
 Half the scored jobs cluster at exactly 50 on the 0-100 scale. The scoring threshold is 40. Which means the model's uncertainty generates work for the human reviewer. The AI hedges, and I have to decide.
 
-This is a small-scale version of the alignment problem: an autonomous agent optimizing for an objective while constrained by values, with a human in the loop who has the final say. Same tension I explored in [polymarket_bot](https://github.com/Cuuper22/polymarket_bot) — knowing when an autonomous system should NOT act. It also found me some good leads.
+This is a small-scale version of the alignment problem: an autonomous agent optimizing for an objective while constrained by values, with a human in the loop who has the final say. Same tension I explored in [polymarket_bot](https://github.com/Cuuper22/polymarket_bot): knowing when an autonomous system should NOT act. It also found me some good leads.
 
 ## Architecture
 
@@ -64,26 +64,33 @@ This is the part I care about most.
 
 ```python
 # From cover_letter.py
-"The candidate does NOT have a completed degree. He has 76 credits
-from Minerva University. Do NOT say 'Bachelor's degree' — say
-'coursework in AI and Physics at Minerva University' or similar
-honest framing."
+"Only claim credentials, dates, tools, and experience that appear in
+the source profile. Do not upgrade partial experience into finished
+credentials. Do not infer availability or authorization details."
 
 # From job_scorer.py
-"No completed degree (76 credits) — penalize roles requiring
-BS/MS but not fatally"
+"Penalize hard requirements that are not present in the source profile.
+Do not treat missing credentials as satisfied requirements."
 
 # From form_qa.py
-"For yes/no questions about degree: the candidate does NOT have
-a completed degree"
+"For yes/no screening questions, answer from source profile facts only.
+If the source profile does not support a claim, answer conservatively."
 ```
 
-This isn't post-hoc filtering. The constraints live in the system prompts themselves — specification-level truthfulness enforcement. Same principle as [Erdos](https://github.com/Cuuper22/Erdos): prevent the optimizer from redefining its own constraints. There, SHA-256 locks. Here, system prompt constraints.
+This isn't post-hoc filtering. The constraints live in the system prompts themselves: specification-level truthfulness enforcement. Same principle as [Erdos](https://github.com/Cuuper22/Erdos): prevent the optimizer from redefining its own constraints. There, SHA-256 locks. Here, system prompt constraints.
 
 **Emergency controls.** Three endpoints on the API gateway:
-- `POST /pause` — pause the Cloud Tasks queue
-- `POST /resume` — resume the queue
-- `POST /emergency-stop` — pause AND purge all pending tasks
+- `POST /pause` - pause the Cloud Tasks queue
+- `POST /resume` - resume the queue
+- `POST /emergency-stop` - pause AND purge all pending tasks
+
+## What To Inspect
+
+- `services/agent-browser/ai/job_scorer.py` for structured fit scoring.
+- `services/agent-browser/ai/cover_letter.py` for constrained generation.
+- `services/agent-browser/applicator/form_filler.py` for ATS-specific form handling.
+- `services/api-gateway/routers/applications.py` for the approval gate before submission.
+- `frontend/src/components/ApplicationReview.tsx` for the human review surface.
 
 ## How It Works
 
@@ -93,28 +100,28 @@ Gemini 3.1 Pro scores each job 0-100 using a structured rubric:
 
 | Score Range | Meaning |
 |-------------|---------|
-| 80-100 | Strong fit — skills and experience align well |
-| 60-79 | Good fit — most requirements met |
-| 40-59 | Moderate fit — some gaps but worth considering |
-| 20-39 | Weak fit — significant mismatches |
-| 0-19 | Poor fit — wrong domain or level |
+| 80-100 | Strong fit - skills and experience align well |
+| 60-79 | Good fit - most requirements met |
+| 40-59 | Moderate fit - some gaps but worth considering |
+| 20-39 | Weak fit - significant mismatches |
+| 0-19 | Poor fit - wrong domain or level |
 
-The model returns structured JSON: `score`, `reasoning`, `role_summary`, `company_summary`, `strengths`, `gaps`, and `suggestions`. The scoring threshold is 40. In practice, scores cluster heavily around 50 — the model hedges when it's unsure, which creates a fat middle band of "maybe" jobs that require human judgment.
+The model returns structured JSON: `score`, `reasoning`, `role_summary`, `company_summary`, `strengths`, `gaps`, and `suggestions`. The scoring threshold is 40. In practice, scores cluster heavily around 50 - the model hedges when it's unsure, which creates a fat middle band of "maybe" jobs that require human judgment.
 
 ### Cover Letters
 
 Each cover letter follows a rigid 4-paragraph structure:
 
-1. **Hook** (3-4 sentences) — why this company, why this role
-2. **Fit & Experience** (5-7 sentences) — relevant background
-3. **Projects & Technical Depth** (4-6 sentences) — specific work
-4. **Close & Call to Action** (2-3 sentences) — next steps
+1. **Hook** (3-4 sentences) - why this company, why this role
+2. **Fit & Experience** (5-7 sentences) - relevant background
+3. **Projects & Technical Depth** (4-6 sentences) - specific work
+4. **Close & Call to Action** (2-3 sentences) - next steps
 
-Word count is enforced at 250-350 words. If the first generation is too short, the system retries with explicit length correction. Tone adapts to company culture — startup casual vs. corporate formal. The honesty constraint means every cover letter says "coursework at Minerva University" instead of "degree from Minerva University."
+Word count is enforced at 250-350 words. If the first generation is too short, the system retries with explicit length correction. Tone adapts to company culture: startup casual vs. corporate formal. The honesty constraint keeps every letter grounded in the source profile instead of letting the model upgrade the candidate.
 
 ### Outreach Emails
 
-A separate module generates warm networking emails — not cold spam. Each email is 150-200 words, references something specific about the recipient or company, and makes a low-friction ask (15-minute chat, not "give me a job"). Same honesty constraints apply: only reference real experience, never fabricate.
+A separate module generates warm networking emails - not cold spam. Each email is 150-200 words, references something specific about the recipient or company, and makes a low-friction ask (15-minute chat, not "give me a job"). Same honesty constraints apply: only reference real experience, never fabricate.
 
 Available via `POST /generate-outreach` with an optional contact name.
 
@@ -124,9 +131,9 @@ Available via `POST /generate-outreach` with an optional contact name.
 
 | ATS | Detection | Handling |
 |-----|-----------|---------|
-| Greenhouse | `greenhouse.io` in URL | Dedicated adapter — `#first_name`, `#last_name`, `#email`, cover letter textarea, file upload |
-| Lever | `lever.co` in URL | Dedicated adapter — `input[name='name']`, `input[name='email']`, comments field |
-| Workday | `myworkdayjobs.com` in URL | Dedicated adapter — `data-automation-id` attributes for each field |
+| Greenhouse | `greenhouse.io` in URL | Dedicated adapter - `#first_name`, `#last_name`, `#email`, cover letter textarea, file upload |
+| Lever | `lever.co` in URL | Dedicated adapter - `input[name='name']`, `input[name='email']`, comments field |
+| Workday | `myworkdayjobs.com` in URL | Dedicated adapter - `data-automation-id` attributes for each field |
 | iCIMS | `icims.com` in URL | Detected, screenshot for manual review |
 | BambooHR | `bamboohr.com` in URL | Detected, screenshot for manual review |
 
@@ -163,11 +170,11 @@ This starts:
 - API Gateway on port 8081
 - Dashboard on port 3000
 
-You'll need a Gemini API key. The `context/` directory (mounted read-only into agent-browser) should contain your resume PDF and any background context files — see `.env.example` for the full list of configuration options.
+You'll need a Gemini API key. The `context/` directory (mounted read-only into agent-browser) should contain your resume PDF and any background context files - see `.env.example` for the full list of configuration options.
 
 ## Testing
 
-There are no unit tests in this repository. The safety mechanisms are architectural: honesty constraints live in system prompts, the approval workflow requires human confirmation, and emergency controls can halt the pipeline. This is a deliberate trade-off — faster iteration on constraint design at the cost of test coverage.
+There are no unit tests in this repository. The safety mechanisms are architectural: honesty constraints live in system prompts, the approval workflow requires human confirmation, and emergency controls can halt the pipeline. This is a deliberate trade-off - faster iteration on constraint design at the cost of test coverage.
 
 ## Known Issues
 
