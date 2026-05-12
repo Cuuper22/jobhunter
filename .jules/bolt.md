@@ -1,0 +1,3 @@
+## 2024-05-12 - [Firestore Batching and N+1 Queries]
+**Learning:** Found an N+1 query issue in the scraper's dataframe loop (`jobspy_wrapper.py`), where each scraped job resulted in an individual Firestore query (`job_exists`) and individual write (`save_job`). This results in high network latency due to sequential requests.
+**Action:** Next time, batch Firestore operations for bulk processing (e.g., using `in` queries for existence checks and `batch()` for writes). Remember that `in` queries are limited to 30 elements, and batch writes are limited to 500 operations, so chunking is required. Also, `existing_urls.add(url)` intra-batch deduplication is necessary to prevent duplicate writes within a batch.

@@ -65,6 +65,42 @@ def update_job_score(job_id: str, score: int, reasoning: str):
     })
 
 
+def get_existing_job_urls(urls: list[str]) -> set[str]:
+    """Bulk check which of the provided job URLs already exist in Firestore."""
+    existing_urls = set()
+    if not urls:
+        return existing_urls
+
+    # Firestore 'in' queries support a maximum of 30 items
+    for i in range(0, len(urls), 30):
+        chunk = urls[i:i + 30]
+        docs = (
+            db.collection("jobs")
+            .where(filter=FieldFilter("url", "in", chunk))
+            .select(["url"])
+            .get()
+        )
+        for doc in docs:
+            existing_urls.add(doc.to_dict().get("url"))
+
+    return existing_urls
+
+
+def save_jobs_batch(jobs: list[Job]) -> list[str]:
+    """Save multiple jobs efficiently using Firestore batch writes."""
+    saved_ids = []
+    for i in range(0, len(jobs), 500):
+        chunk = jobs[i:i + 500]
+        batch = db.batch()
+        for job in chunk:
+            doc_ref = db.collection("jobs").document()
+            job.id = doc_ref.id
+            batch.set(doc_ref, job.model_dump(mode="json"))
+            saved_ids.append(job.id)
+        batch.commit()
+    return saved_ids
+
+
 # ---------- Applications ----------
 
 def save_application(app: Application) -> str:
