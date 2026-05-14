@@ -4,6 +4,7 @@ Serves as the central API for the React dashboard.
 Proxies requests to agent-browser service and manages Firestore state.
 """
 
+import asyncio
 import logging
 import math
 import os
@@ -54,19 +55,16 @@ async def stats(user=Depends(verify_firebase_token)):
     from shared.firestore_client import db
     from google.cloud.firestore_v1 import aggregation
 
-    jobs_count = db.collection("jobs").count().get()[0][0].value
-    apps_count = db.collection("applications").count().get()[0][0].value
-    pending_count = (
-        db.collection("applications")
-        .where("status", "==", "pending_approval")
-        .count()
-        .get()[0][0].value
-    )
-    submitted_count = (
-        db.collection("applications")
-        .where("status", "==", "submitted")
-        .count()
-        .get()[0][0].value
+    # ⚡ Bolt: parallelized aggregation queries via asyncio.to_thread and asyncio.gather
+    # to avoid blocking the event loop and to reduce latency.
+    def _count(query):
+        return query.count().get()[0][0].value
+
+    jobs_count, apps_count, pending_count, submitted_count = await asyncio.gather(
+        asyncio.to_thread(_count, db.collection("jobs")),
+        asyncio.to_thread(_count, db.collection("applications")),
+        asyncio.to_thread(_count, db.collection("applications").where("status", "==", "pending_approval")),
+        asyncio.to_thread(_count, db.collection("applications").where("status", "==", "submitted"))
     )
 
     return {
@@ -82,8 +80,10 @@ async def recent_logs(limit: int = 50, user=Depends(verify_firebase_token)):
     """Get recent activity logs for the dashboard log stream."""
     from shared.firestore_client import db
 
-    docs = (
-        db.collection("logs")
+    # ⚡ Bolt: wrap synchronous firestore .get() inside asyncio.to_thread
+    # to prevent event loop blocking.
+    docs = await asyncio.to_thread(
+        lambda: db.collection("logs")
         .order_by("timestamp", direction="DESCENDING")
         .limit(limit)
         .get()
