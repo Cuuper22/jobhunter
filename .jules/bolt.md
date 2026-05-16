@@ -1,0 +1,3 @@
+## 2024-05-16 - Parallelize Independent DB Queries in FastAPI
+**Learning:** Multiple independent synchronous database queries within FastAPI async routes (like consecutive Firestore `.count().get()` aggregations in `/api/stats`) execute sequentially and block the main event loop if not properly parallelized using `asyncio.to_thread`.
+**Action:** When performing multiple independent I/O bound synchronous calls (such as aggregations or separate query fetches), define them as small wrapper functions and run them concurrently using `await asyncio.gather(*[asyncio.to_thread(func) for func in funcs])` to significantly improve route response time and prevent event loop blocking.
