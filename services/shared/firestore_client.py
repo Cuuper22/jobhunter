@@ -47,6 +47,29 @@ def get_job(job_id: str) -> Optional[Job]:
     return Job(**doc.to_dict()) if doc.exists else None
 
 
+def bulk_job_exists(urls: set[str]) -> set[str]:
+    """Check existence of multiple job URLs (dedup) in chunks of 30."""
+    if not urls:
+        return set()
+
+    existing = set()
+    urls_list = list(urls)
+
+    # Firestore 'in' queries support max 30 items
+    chunk_size = 30
+    for i in range(0, len(urls_list), chunk_size):
+        chunk = urls_list[i:i + chunk_size]
+        docs = (
+            db.collection("jobs")
+            .where(filter=FieldFilter("url", "in", chunk))
+            .get()
+        )
+        for doc in docs:
+            existing.add(doc.to_dict().get("url"))
+
+    return existing
+
+
 def job_exists(url: str) -> bool:
     """Check if a job URL has already been scraped (dedup)."""
     docs = (
@@ -56,6 +79,29 @@ def job_exists(url: str) -> bool:
         .get()
     )
     return len(docs) > 0
+
+
+def save_jobs_batch(jobs: list[Job]) -> list[str]:
+    """Save multiple scraped jobs using batched writes (max 500 per batch)."""
+    if not jobs:
+        return []
+
+    job_ids = []
+    chunk_size = 500
+
+    for i in range(0, len(jobs), chunk_size):
+        chunk = jobs[i:i + chunk_size]
+        batch = db.batch()
+
+        for job in chunk:
+            doc_ref = db.collection("jobs").document()
+            job.id = doc_ref.id
+            job_ids.append(job.id)
+            batch.set(doc_ref, job.model_dump(mode="json"))
+
+        batch.commit()
+
+    return job_ids
 
 
 def update_job_score(job_id: str, score: int, reasoning: str):
